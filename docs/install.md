@@ -115,11 +115,11 @@ networkPolicy:
 
 ```sh
 helm upgrade --install openshell-dashboard \
-  oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart/openshell-dashboard \
+  oci://ghcr.io/ai-openshell/console/helm-chart/openshell-dashboard \
   --version <dashboard version> --namespace openshell -f values.yaml
 ```
 
-`<dashboard version>` is the newest dashboard release whose first two numbers match your gateway's: a `0.1.N` for a gateway `0.1.x` ([Compatibility](../README.md#compatibility), [releases](https://github.com/Gkrumbach07/openshell-dashboard/releases)). Then check:
+`<dashboard version>` is the newest dashboard release whose first two numbers match your gateway's: a `0.1.N` for a gateway `0.1.x` ([Compatibility](../README.md#compatibility), [releases](https://github.com/ai-openshell/console/releases)). Releases up to `0.1.2` were also published at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart/openshell-dashboard`, the chart's home before the repository moved; that path receives no newer release. Then check:
 
 ```sh
 kubectl -n openshell rollout status deploy/openshell-dashboard

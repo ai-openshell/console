@@ -5,7 +5,7 @@ Thank you for your interest in contributing.
 ## Getting started
 
 ```sh
-git clone https://github.com/Gkrumbach07/openshell-dashboard.git && cd openshell-dashboard
+git clone https://github.com/ai-openshell/console.git && cd console
 ```
 
 Then follow [Run it locally](docs/development.md#run-it-locally): `make setup`, `make gateway` and `make dev`.

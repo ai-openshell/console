@@ -10,7 +10,9 @@ A release `vX.Y.Z` is three things, all made by `publish.yml`:
 |---|---|---|
 | GitHub release `vX.Y.Z`, and the git tag with it | this repository | `scripts/release/cut-release.mjs` |
 | Container image tags `X.Y.Z` and `X.Y` | `quay.io/gkrumbach07/openshell-dashboard` | retagging the image CI already built |
-| Helm chart `openshell-dashboard`, version `X.Y.Z` | `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart` | packaging the chart at the released commit |
+| Helm chart `openshell-dashboard`, version `X.Y.Z` | `oci://ghcr.io/ai-openshell/console/helm-chart` | packaging the chart at the released commit |
+
+The chart's registry path follows the repository's name (`publish.yml` pushes to `oci://ghcr.io/<owner>/<repository>/helm-chart`), so a package created under a new name starts out private: make it public in the organization's package settings before announcing the release. Releases up to `0.1.2` are at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart`, the path before the repository moved to `ai-openshell/console`; nothing is published there any more.
 
 The BFF and the UI ship together and share the version.
 
