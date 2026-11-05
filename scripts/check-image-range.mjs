@@ -3,7 +3,7 @@
 // line it is for and the SDK it was built against, on every platform it was
 // built for.
 //
-//   node scripts/check-image-range.mjs quay.io/gkrumbach07/openshell-dashboard:sha-0a1b2c3
+//   node scripts/check-image-range.mjs ghcr.io/ai-openshell/console:sha-0a1b2c3
 //
 // Both reach the image as build args: ci.yml passes them, and deploy/Dockerfile
 // turns them into two labels. A build arg that is misspelt on either side is
@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { readGatewayLine } from './gateway-range.mjs';
 
 // Must match the LABEL keys in deploy/Dockerfile.
-export const LABEL_PREFIX = 'io.github.gkrumbach07.openshell-dashboard';
+export const LABEL_PREFIX = 'io.github.ai-openshell.console';
 
 /** The labels deploy/Dockerfile should have baked in for this build. */
 export function expectedLabels(declared) {

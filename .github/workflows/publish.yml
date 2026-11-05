@@ -212,7 +212,7 @@ jobs:
   # released, sha-<commit> names a new build by now, and retag-image.sh fails
   # here rather than move the release onto it. See docs/releasing.md.
   #
-  # A separate job so that the registry credentials are never in the job that
+  # A separate job so that the package permission is never in the job that
   # holds the repository permissions, and so that a registry hiccup can
   # be retried on its own ("Re-run failed jobs") without touching the release.
   tag-image:
@@ -221,6 +221,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -229,9 +230,9 @@ jobs:
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
-          registry: quay.io
-          username: ${{ secrets.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_ROBOT_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Tag the image built for this commit with the release version
         env:
           SOURCE_TAG: ${{ needs.publish.outputs.source_tag }}
@@ -239,7 +240,7 @@ jobs:
         run: |
           set -euo pipefail
           read -r -a tags <<< "$IMAGE_TAGS"
-          scripts/retag-image.sh quay.io/gkrumbach07/openshell-dashboard "$SOURCE_TAG" "${tags[@]}"
+          scripts/retag-image.sh ghcr.io/ai-openshell/console "$SOURCE_TAG" "${tags[@]}"
 
   # Packaged from this commit with the image tag that tag-image just published.
   # Never re-push a stable OCI version; an existing version is left unchanged.

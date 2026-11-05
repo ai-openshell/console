@@ -16,9 +16,9 @@ global:
 dashboard:
   image:
     # -- Dashboard image registry; empty uses global.image.registry.
-    registry: ""
+    registry: ghcr.io
     # -- Dashboard image repository.
-    repository: gkrumbach07/openshell-dashboard
+    repository: ai-openshell/console
     # -- Dashboard image tag; empty uses global.image.tag then Chart.appVersion.
     tag: ""
     # -- Dashboard image digest; takes precedence over tag.

@@ -2,7 +2,7 @@
 # Give an image that is already in the registry more tags, without rebuilding.
 #
 #   scripts/retag-image.sh IMAGE SOURCE_TAG NEW_TAG [NEW_TAG...]
-#   scripts/retag-image.sh quay.io/gkrumbach07/openshell-dashboard sha-0a1b2c3 0.1.4 0.1
+#   scripts/retag-image.sh ghcr.io/ai-openshell/console sha-0a1b2c3 0.1.4 0.1
 #
 # CI builds one image per commit and tags it sha-<commit>. Every other tag is a
 # statement about that same image, made later by something that knows more:

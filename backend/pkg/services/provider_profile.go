@@ -6,7 +6,7 @@ import (
 	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
 	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/models"
+	"github.com/ai-openshell/console/backend/pkg/models"
 )
 
 // ProviderProfileStore reads and writes provider profiles as the gateway's own

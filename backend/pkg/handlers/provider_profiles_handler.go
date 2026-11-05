@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/apiutils"
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/models"
+	"github.com/ai-openshell/console/backend/pkg/apiutils"
+	"github.com/ai-openshell/console/backend/pkg/models"
 )
 
 // The provider profile routes, which ProvidersHandler serves in two scopes.

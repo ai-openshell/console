@@ -1,4 +1,4 @@
-module github.com/Gkrumbach07/openshell-dashboard/backend
+module github.com/ai-openshell/console/backend
 
 go 1.26.7
 

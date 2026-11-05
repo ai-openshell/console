@@ -11,8 +11,8 @@ import (
 	"github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/fake"
 	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/auth"
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/models"
+	"github.com/ai-openshell/console/backend/pkg/auth"
+	"github.com/ai-openshell/console/backend/pkg/models"
 )
 
 // scopeRecorder is a profile store that notes the scope of every call.

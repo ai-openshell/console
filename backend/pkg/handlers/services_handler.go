@@ -3,9 +3,9 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/apiutils"
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/models"
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/services"
+	"github.com/ai-openshell/console/backend/pkg/apiutils"
+	"github.com/ai-openshell/console/backend/pkg/models"
+	"github.com/ai-openshell/console/backend/pkg/services"
 )
 
 // ExposeServiceRequest is the expose-service body. Service may be empty: a

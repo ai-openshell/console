@@ -12,9 +12,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/services"
 	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
 	"github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/types"
+	"github.com/ai-openshell/console/backend/pkg/services"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
