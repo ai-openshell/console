@@ -325,6 +325,9 @@ jobs:
 
   build:
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
     env:
       PUBLISH_IMAGE: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     strategy:
@@ -356,13 +359,13 @@ jobs:
       - uses: docker/login-action@v3
         if: env.PUBLISH_IMAGE == 'true'
         with:
-          registry: quay.io
-          username: ${{ secrets.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_ROBOT_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: quay.io/gkrumbach07/openshell-dashboard
+          images: ghcr.io/ai-openshell/console
       - uses: docker/build-push-action@v6
         id: build
         with:
@@ -380,7 +383,7 @@ jobs:
             DASHBOARD_COMMIT=${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,scope=${{ matrix.platform }},mode=max
-          outputs: ${{ env.PUBLISH_IMAGE == 'true' && 'type=image,name=quay.io/gkrumbach07/openshell-dashboard,push-by-digest=true,name-canonical=true,push=true' || '' }}
+          outputs: ${{ env.PUBLISH_IMAGE == 'true' && 'type=image,name=ghcr.io/ai-openshell/console,push-by-digest=true,name-canonical=true,push=true' || '' }}
       - name: Export digest
         if: env.PUBLISH_IMAGE == 'true'
         run: |
@@ -410,6 +413,9 @@ jobs:
   push-manifest:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     needs: [build]
     steps:
       - uses: actions/download-artifact@v4
@@ -420,13 +426,13 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
-          registry: quay.io
-          username: ${{ secrets.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_ROBOT_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: quay.io/gkrumbach07/openshell-dashboard
+          images: ghcr.io/ai-openshell/console
           # sha-<first 7 characters of the commit> is how every later tag finds
           # this image: promote-latest below, and the version tags publish.yml
           # adds when a release is cut. Keep the format in step with both.
@@ -438,7 +444,7 @@ jobs:
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'quay.io/gkrumbach07/openshell-dashboard@sha256:%s ' *)
+            $(printf 'ghcr.io/ai-openshell/console@sha256:%s ' *)
 
   # Reads the image that push-manifest just pushed back from the registry and
   # checks that its labels declare the gateway release line and the SDK on both
@@ -453,14 +459,24 @@ jobs:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     needs: [push-manifest]
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
       - uses: docker/setup-buildx-action@v3
+      # A new GHCR package is private until an org admin makes it public, and
+      # reading a private image needs a login.
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: The pushed image declares its gateway release line
-        run: node scripts/check-image-range.mjs "quay.io/gkrumbach07/openshell-dashboard:sha-${GITHUB_SHA::7}"
+        run: node scripts/check-image-range.mjs "ghcr.io/ai-openshell/console:sha-${GITHUB_SHA::7}"
 
   # `latest` only moves to a commit that passed everything, and only forward.
   #
@@ -488,6 +504,9 @@ jobs:
   promote-latest:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     needs:
       [
         push-manifest,
@@ -513,12 +532,12 @@ jobs:
       - uses: docker/login-action@v3
         if: steps.tip.outputs.is_tip == 'true'
         with:
-          registry: quay.io
-          username: ${{ secrets.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_ROBOT_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Point latest at this commit's image
         if: steps.tip.outputs.is_tip == 'true'
-        run: scripts/retag-image.sh quay.io/gkrumbach07/openshell-dashboard "sha-${GITHUB_SHA::7}" latest
+        run: scripts/retag-image.sh ghcr.io/ai-openshell/console "sha-${GITHUB_SHA::7}" latest
 
   # Dev charts are deliberately floating. Stable chart versions are published
   # only from publish.yml after the versioned container image has been tagged.

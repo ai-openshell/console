@@ -6,8 +6,8 @@ package services
 import (
 	"context"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/models"
 	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
+	"github.com/ai-openshell/console/backend/pkg/models"
 )
 
 // GatewayServiceInterface is what GatewayHandler depends on. GatewayService

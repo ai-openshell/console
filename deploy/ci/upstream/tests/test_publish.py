@@ -9,7 +9,7 @@ from tests import support
 MAIN = "a" * 40
 OLD = "b" * 40
 NEW = "c" * 40
-REPO_URL = "https://github.com/Gkrumbach07/openshell-dashboard"
+REPO_URL = "https://github.com/ai-openshell/console"
 
 
 def plan_for(target, pinned="0.1.3"):

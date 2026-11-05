@@ -11,7 +11,7 @@ import (
 	sbv1 "github.com/NVIDIA/OpenShell/sdk/go/proto/sandboxv1"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/models"
+	"github.com/ai-openshell/console/backend/pkg/models"
 )
 
 // fakeSDKProfiles is the SDK's profile client over what it was last given.

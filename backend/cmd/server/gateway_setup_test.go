@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/models"
+	"github.com/ai-openshell/console/backend/pkg/models"
 )
 
 // captureLogs swaps the default logger for the duration of a test and returns

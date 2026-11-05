@@ -15,9 +15,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/apiutils"
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/services"
 	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
+	"github.com/ai-openshell/console/backend/pkg/apiutils"
+	"github.com/ai-openshell/console/backend/pkg/services"
 )
 
 const defaultUploadDir = "/sandbox"

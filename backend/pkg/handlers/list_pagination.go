@@ -6,7 +6,7 @@ import (
 
 	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/apiutils"
+	"github.com/ai-openshell/console/backend/pkg/apiutils"
 )
 
 // listRequestOptions keeps the existing array response unless pageSize was

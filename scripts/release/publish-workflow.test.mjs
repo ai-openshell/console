@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'publish.yml'), 'utf8');
-const REPO = 'Gkrumbach07/openshell-dashboard';
+const REPO = 'ai-openshell/console';
 const haveBash = spawnSync('bash', ['--version'], { stdio: 'ignore' }).status === 0;
 
 /** The shell of the step with this name, as the runner would run it. */

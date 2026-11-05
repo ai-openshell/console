@@ -58,7 +58,7 @@ EXPOSE 8080
 # Kept at the end of the stage so that changing them rebuilds nothing above.
 ARG GATEWAY_RELEASE_LINE=""
 ARG OPENSHELL_SDK_VERSION=""
-LABEL io.github.gkrumbach07.openshell-dashboard.gateway.line="${GATEWAY_RELEASE_LINE}" \
-      io.github.gkrumbach07.openshell-dashboard.sdk="${OPENSHELL_SDK_VERSION}"
+LABEL io.github.ai-openshell.console.gateway.line="${GATEWAY_RELEASE_LINE}" \
+      io.github.ai-openshell.console.sdk="${OPENSHELL_SDK_VERSION}"
 
 ENTRYPOINT ["/usr/local/bin/openshell-dashboard"]

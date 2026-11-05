@@ -9,9 +9,9 @@ import (
 
 	"github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/fake"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/apiutils"
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/auth"
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/models"
+	"github.com/ai-openshell/console/backend/pkg/apiutils"
+	"github.com/ai-openshell/console/backend/pkg/auth"
+	"github.com/ai-openshell/console/backend/pkg/models"
 )
 
 // The policy routes exist only if app.go mounts them. Each request here is one

@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/auth"
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/handlers"
+	"github.com/ai-openshell/console/backend/pkg/auth"
+	"github.com/ai-openshell/console/backend/pkg/handlers"
 )
 
 func testApp(extensions ...Extension) *App {

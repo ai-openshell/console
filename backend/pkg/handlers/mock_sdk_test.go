@@ -25,12 +25,12 @@ type mockSDK struct {
 	files      mockSDKFiles
 }
 
-func (m *mockSDK) Sandboxes() openshell.SandboxInterface    { return &m.sandboxes }
-func (m *mockSDK) Providers() openshell.ProviderInterface   { return &m.providers }
-func (m *mockSDK) Services() openshell.ServiceInterface     { return &m.services }
-func (m *mockSDK) Exec() openshell.ExecInterface            { return &m.exec }
-func (m *mockSDK) Files() openshell.FileInterface           { return &m.files }
-func (m *mockSDK) Health() openshell.HealthInterface        { return &m.health }
+func (m *mockSDK) Sandboxes() openshell.SandboxInterface  { return &m.sandboxes }
+func (m *mockSDK) Providers() openshell.ProviderInterface { return &m.providers }
+func (m *mockSDK) Services() openshell.ServiceInterface   { return &m.services }
+func (m *mockSDK) Exec() openshell.ExecInterface          { return &m.exec }
+func (m *mockSDK) Files() openshell.FileInterface         { return &m.files }
+func (m *mockSDK) Health() openshell.HealthInterface      { return &m.health }
 func (m *mockSDK) SandboxSuspendResume() openshell.SandboxSuspendResumeInterface {
 	panic("not implemented")
 }

@@ -21,9 +21,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/auth"
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/models"
-	"github.com/Gkrumbach07/openshell-dashboard/backend/pkg/server"
+	"github.com/ai-openshell/console/backend/pkg/auth"
+	"github.com/ai-openshell/console/backend/pkg/models"
+	"github.com/ai-openshell/console/backend/pkg/server"
 )
 
 const (

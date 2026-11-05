@@ -8,7 +8,7 @@ import plan as plan_module
 import report
 from tests import support
 
-REPO_URL = "https://github.com/Gkrumbach07/openshell-dashboard"
+REPO_URL = "https://github.com/ai-openshell/console"
 RUN_URL = REPO_URL + "/actions/runs/42"
 
 

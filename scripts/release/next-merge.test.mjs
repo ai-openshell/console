@@ -18,7 +18,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // ---- which commit may release without being asked ---------------------------
 
-const REPO = 'Gkrumbach07/openshell-dashboard';
+const REPO = 'ai-openshell/console';
 const pull = (overrides = {}) => ({
   merged_at: '2026-10-14T06:30:00Z',
   base: { ref: 'main' },

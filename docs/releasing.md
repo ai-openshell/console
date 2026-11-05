@@ -9,10 +9,10 @@ A release `vX.Y.Z` is three things, all made by `publish.yml`:
 | Artifact | Where | Made by |
 |---|---|---|
 | GitHub release `vX.Y.Z`, and the git tag with it | this repository | `scripts/release/cut-release.mjs` |
-| Container image tags `X.Y.Z` and `X.Y` | `quay.io/gkrumbach07/openshell-dashboard` | retagging the image CI already built |
+| Container image tags `X.Y.Z` and `X.Y` | `ghcr.io/ai-openshell/console` | retagging the image CI already built |
 | Helm chart `openshell-dashboard`, version `X.Y.Z` | `oci://ghcr.io/ai-openshell/console/helm-chart` | packaging the chart at the released commit |
 
-The chart's registry path follows the repository's name (`publish.yml` pushes to `oci://ghcr.io/<owner>/<repository>/helm-chart`), so a package created under a new name starts out private: make it public in the organization's package settings before announcing the release. Releases up to `0.1.2` are at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart`, the path before the repository moved to `ai-openshell/console`; nothing is published there any more.
+The chart's registry path follows the repository's name (`publish.yml` pushes to `oci://ghcr.io/<owner>/<repository>/helm-chart`), so a package created under a new name starts out private: make it public in the organization's package settings before announcing the release. Releases up to `0.1.2` are at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart`, the path before the repository moved to `ai-openshell/console`; nothing is published there any more. The image moved the same way: releases up to `0.1.3` are at `quay.io/gkrumbach07/openshell-dashboard`, and CI pushes every newer image to `ghcr.io/ai-openshell/console` with the workflow's own token, so no registry secret is needed. That package also starts out private.
 
 The BFF and the UI ship together and share the version.
 
@@ -125,7 +125,7 @@ The GitHub release and the container image each state the gateway release line t
 | Artifact | What it carries | Written by |
 |---|---|---|
 | GitHub release | a *Supported OpenShell gateways* section: the line, the gateway release it was built on and tested against, the SDK, and a line that changed since the previous release | `scripts/release/release-notes.mjs` |
-| Container image | labels `io.github.gkrumbach07.openshell-dashboard.gateway.line` and `.sdk` | build args in the `build` job of `ci.yml`; `image-range` fails if the pushed image lacks them |
+| Container image | labels `io.github.ai-openshell.console.gateway.line` and `.sdk` | build args in the `build` job of `ci.yml`; `image-range` fails if the pushed image lacks them |
 | README | the generated table under *Compatibility* | `scripts/readme-gateway-range.mjs --write`, checked in CI |
 
 The BFF does not read the labels. Its line is compiled in (`BuiltInGatewayReleaseLine` in [`backend/pkg/models/gateway_release_line.go`](../backend/pkg/models/gateway_release_line.go)), so the compatibility notice also works in an image built without the build args. `node scripts/gateway-range.mjs --check` fails unless that constant and the SDK version in `backend/go.mod` agree with the pins file. The SDK moves with the gateway images in one commit ([ADR 0005](adrs/0005-gateway-compatibility-and-releases.md), decision 7), and so does the constant when the pin moves to a new minor.

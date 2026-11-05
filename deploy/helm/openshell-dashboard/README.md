@@ -124,8 +124,8 @@ These files are in the repository, not in the packaged chart. CI renders each on
 | autoscaling.targetMemoryUtilizationPercentage | string | `nil` | Memory target utilization (null to disable). |
 | dashboard.image.digest | string | `""` | Dashboard image digest; takes precedence over tag. |
 | dashboard.image.pullPolicy | string | `nil` | Dashboard pull policy; null uses global.image.pullPolicy. |
-| dashboard.image.registry | string | `""` | Dashboard image registry; empty uses global.image.registry. |
-| dashboard.image.repository | string | `"gkrumbach07/openshell-dashboard"` | Dashboard image repository. |
+| dashboard.image.registry | string | `"ghcr.io"` | Dashboard image registry; empty uses global.image.registry. |
+| dashboard.image.repository | string | `"ai-openshell/console"` | Dashboard image repository. |
 | dashboard.image.tag | string | `""` | Dashboard image tag; empty uses global.image.tag then Chart.appVersion. |
 | dashboard.logoutURL | string | `"/oauth2/sign_out?rd=/oauth2/sign_in"` | Browser-facing sign-out URL; rd returns to oauth2-proxy sign-in after clearing the session. |
 | dashboard.port | int | `8080` | Dashboard container port (loopback only; never exposed via Service). |
