@@ -49,13 +49,13 @@ Install the published chart:
 
 ```sh
 helm upgrade --install openshell-dashboard \
-  oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart/openshell-dashboard \
+  oci://ghcr.io/ai-openshell/console/helm-chart/openshell-dashboard \
   --version <dashboard version> --namespace openshell -f values.yaml
 ```
 
-`<dashboard version>` is the newest dashboard release whose first two numbers match your gateway's: a `0.1.N` for a gateway `0.1.x` ([Compatibility](https://github.com/Gkrumbach07/openshell-dashboard#compatibility), [releases](https://github.com/Gkrumbach07/openshell-dashboard/releases)).
+`<dashboard version>` is the newest dashboard release whose first two numbers match your gateway's: a `0.1.N` for a gateway `0.1.x` ([Compatibility](https://github.com/ai-openshell/console#compatibility), [releases](https://github.com/ai-openshell/console/releases)).
 
-The [install guide](https://github.com/Gkrumbach07/openshell-dashboard/blob/main/docs/install.md) has every step: the Keycloak realm, the gateway's settings, OpenShift, sign-out and workspace membership.
+The [install guide](https://github.com/ai-openshell/console/blob/main/docs/install.md) has every step: the Keycloak realm, the gateway's settings, OpenShift, sign-out and workspace membership.
 
 ## Example values
 
@@ -63,21 +63,21 @@ These files are in the repository, not in the packaged chart. CI renders each on
 
 | File | When it applies |
 |---|---|
-| [`values-keycloak.yaml`](https://github.com/Gkrumbach07/openshell-dashboard/blob/main/deploy/helm/openshell-dashboard/ci/values-keycloak.yaml) | Keycloak as the identity provider: the role gate, PKCE, and a sign-out that ends the Keycloak session |
-| [`values-gateway-api.yaml`](https://github.com/Gkrumbach07/openshell-dashboard/blob/main/deploy/helm/openshell-dashboard/ci/values-gateway-api.yaml) | An HTTPRoute attached to an existing Gateway |
-| [`values-port-forward.yaml`](https://github.com/Gkrumbach07/openshell-dashboard/blob/main/deploy/helm/openshell-dashboard/ci/values-port-forward.yaml) | A trial through `kubectl port-forward`, without an ingress |
-| [`values-route-edge.yaml`](https://github.com/Gkrumbach07/openshell-dashboard/blob/main/deploy/helm/openshell-dashboard/ci/values-route-edge.yaml) | An OpenShift Route that terminates TLS at the router |
-| [`values-route-reencrypt.yaml`](https://github.com/Gkrumbach07/openshell-dashboard/blob/main/deploy/helm/openshell-dashboard/ci/values-route-reencrypt.yaml) | An OpenShift Route with reencrypt, where oauth2-proxy serves HTTPS |
-| [`values-openshift-scc.yaml`](https://github.com/Gkrumbach07/openshell-dashboard/blob/main/deploy/helm/openshell-dashboard/ci/values-openshift-scc.yaml) | OpenShift's `restricted-v2` SCC, which assigns the user and group |
-| [`values-mtls-client-cert.yaml`](https://github.com/Gkrumbach07/openshell-dashboard/blob/main/deploy/helm/openshell-dashboard/ci/values-mtls-client-cert.yaml) | A gateway that requires a client certificate and has no OIDC |
-| [`values-tls-disabled.yaml`](https://github.com/Gkrumbach07/openshell-dashboard/blob/main/deploy/helm/openshell-dashboard/ci/values-tls-disabled.yaml) | A gateway that runs without TLS, on a trusted network |
+| [`values-keycloak.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-keycloak.yaml) | Keycloak as the identity provider: the role gate, PKCE, and a sign-out that ends the Keycloak session |
+| [`values-gateway-api.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-gateway-api.yaml) | An HTTPRoute attached to an existing Gateway |
+| [`values-port-forward.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-port-forward.yaml) | A trial through `kubectl port-forward`, without an ingress |
+| [`values-route-edge.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-route-edge.yaml) | An OpenShift Route that terminates TLS at the router |
+| [`values-route-reencrypt.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-route-reencrypt.yaml) | An OpenShift Route with reencrypt, where oauth2-proxy serves HTTPS |
+| [`values-openshift-scc.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-openshift-scc.yaml) | OpenShift's `restricted-v2` SCC, which assigns the user and group |
+| [`values-mtls-client-cert.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-mtls-client-cert.yaml) | A gateway that requires a client certificate and has no OIDC |
+| [`values-tls-disabled.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-tls-disabled.yaml) | A gateway that runs without TLS, on a trusted network |
 
 ## Configuration notes
 
 - **Identity provider**
   - `oidc.provider` is `oidc` for any OIDC issuer and `keycloak-oidc` for Keycloak. Limit who reaches the UI with `oidc.allowedRoles`, which needs `keycloak-oidc`, or with `oidc.allowedGroups`.
   - `oidc.clientIdSecretKey` takes the client ID from the Secret and wins over `oidc.clientId`. `oidc.caConfigMapName` trusts an issuer certificate from a private CA.
-  - oauth2-proxy forwards the access token. The gateway's issuer, audience, roles claim, admin role and user role have to agree with what that token carries; the [install guide](https://github.com/Gkrumbach07/openshell-dashboard/blob/main/docs/install.md) has the gateway's key names.
+  - oauth2-proxy forwards the access token. The gateway's issuer, audience, roles claim, admin role and user role have to agree with what that token carries; the [install guide](https://github.com/ai-openshell/console/blob/main/docs/install.md) has the gateway's key names.
   - `oidc.audience` and `oidc.rolesClaim` are informational: they change no token, and the chart only prints the audience in its post-install notes.
 - **Gateway connection**
   - The chart mounts the gateway's CA from the Secret `gateway.caSecretName`, key `gateway.caKey`, in the release namespace.

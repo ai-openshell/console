@@ -7,7 +7,7 @@ A dashboard release is for one minor release line of the OpenShell gateway: ever
 | Your gateway | Dashboard | Container image |
 |---|---|---|
 | `0.1.x` | `0.1.x` | `quay.io/gkrumbach07/openshell-dashboard:0.1` for the newest release of the line, or an exact `:0.1.N` |
-| `0.0.116` | the [`gateway-0.0.116`](https://github.com/Gkrumbach07/openshell-dashboard/releases/tag/gateway-0.0.116) release | `quay.io/gkrumbach07/openshell-dashboard:gateway-0.0.116` |
+| `0.0.116` | the [`gateway-0.0.116`](https://github.com/ai-openshell/console/releases/tag/gateway-0.0.116) release | `quay.io/gkrumbach07/openshell-dashboard:gateway-0.0.116` |
 
 `gateway-0.0.116` is a one-off build outside the version numbering, because gateway `0.0.x` releases were not compatible with each other. It has no Templates support (gateway `0.0.116` has no sandbox-template RPCs), and no further release is planned for it.
 

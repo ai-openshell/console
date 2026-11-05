@@ -11,7 +11,7 @@ OpenShell Dashboard is a web UI for one OpenShell gateway. The BFF is given one 
 
 1. **Standalone is the only mode.** The dashboard is an application of its own, with its own address, navigation and sign-in. It is not embedded in another application's UI, not loaded as a remote module and not published as a library.
 2. **One container image holds the whole application.** The Go BFF serves the REST API under `/api/v1` and the built React UI from the same process. The image is `quay.io/gkrumbach07/openshell-dashboard`.
-3. **It is installed with the Helm chart in `deploy/helm/openshell-dashboard`,** published as an OCI chart at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart/openshell-dashboard`. The chart runs the BFF with oauth2-proxy beside it in one pod ([ADR 0002](0002-auth-relay-only-bff.md)) and exposes the proxy through a Gateway API HTTPRoute or an OpenShift Route.
+3. **It is installed with the Helm chart in `deploy/helm/openshell-dashboard`,** published as an OCI chart at `oci://ghcr.io/ai-openshell/console/helm-chart/openshell-dashboard`. The chart runs the BFF with oauth2-proxy beside it in one pod ([ADR 0002](0002-auth-relay-only-bff.md)) and exposes the proxy through a Gateway API HTTPRoute or an OpenShift Route.
 4. **The BFF never does the following.** It does not terminate authentication, validate tokens or authorize (ADR 0002). It does not call the Kubernetes API. It does not fetch, store or inject provider credentials: they pass through to the gateway and only their names come back. It does not rate-limit. It holds no state: no session store, no database, nothing that ties a request to a replica.
 5. **Nothing is published to npm.** `frontend/package.json` is `private`, and the UI is built only as part of the image.
 
