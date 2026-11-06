@@ -1,0 +1,21 @@
+# OpenShell Dashboard code owners
+# These users will be automatically requested for review on PRs.
+
+# Default owners for everything
+* @Gkrumbach07
+
+# Architecture decisions require explicit review
+docs/adrs/ @Gkrumbach07
+
+# Auth and security changes require explicit review
+backend/pkg/auth/ @Gkrumbach07
+.claude/rules/security.md @Gkrumbach07
+
+# CI and release automation: these hold the tokens that publish packages and
+# push branches, so a change gets a security review from the organization's
+# infra team. A later rule wins, so these override the default above.
+/.github/ @ai-openshell/infra
+/scripts/release/ @ai-openshell/infra
+/scripts/retag-image.sh @ai-openshell/infra
+/scripts/branch-tip.sh @ai-openshell/infra
+/deploy/ci/upstream/ @ai-openshell/infra
