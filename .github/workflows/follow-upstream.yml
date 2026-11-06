@@ -52,12 +52,16 @@
 #      nothing more.
 #   8. A bump branch is created, never moved.         publish.py
 #
-# TOKEN. Only the workflow's default token is used. GitHub starts no workflow
-# for a pull request it opens, so the bump job starts CI on the branch with a
-# workflow_dispatch, which it does start. Opening the pull request needs the
-# repository setting "Allow GitHub Actions to create and approve pull
-# requests"; while it is off, the branch is pushed, CI is started, and the run
-# fails with the link to open the pull request by hand.
+# TOKENS. The bump job pushes and opens the pull request with a token of the
+# organization's bump-bot GitHub App, made at the start of the job from the
+# App's client ID and private key. Those secrets live in the `bump-bot`
+# environment, which only `main` can deploy to, so a run from any other ref
+# cannot reach them. An App's pull request starts CI like a person's does;
+# one opened with the workflow's default token would start none, which is why
+# the default token is not used for it. The token is asked for with the two
+# permissions the job needs, contents and pull requests, and nothing else.
+# Every other job uses the default token, read only except the report's
+# issues: write.
 
 name: Follow upstream
 
@@ -117,7 +121,7 @@ jobs:
       sandbox_image: ${{ steps.plan.outputs.sandbox_image }}
       config_schema: ${{ steps.plan.outputs.config_schema }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Unit-test the upstream logic
         run: python3 -m unittest discover -s deploy/ci/upstream
@@ -135,7 +139,7 @@ jobs:
           $FOLLOW plan --version "$VERSION" --dry-run "$DRY_RUN" --out /tmp/upstream/plan.json --summary /tmp/upstream/plan.md
           cat /tmp/upstream/plan.md >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: upstream-plan
           path: /tmp/upstream/plan.json
@@ -158,32 +162,43 @@ jobs:
     needs: plan
     if: needs.plan.outputs.bump == 'true'
     runs-on: ubuntu-latest
+    # The App's secrets are in this environment, and only main may use it.
+    environment: bump-bot
     permissions:
-      contents: write        # push the new bump branch
-      pull-requests: write   # open its pull request
-      actions: write         # start CI on it (workflow_dispatch)
+      contents: read         # the checkout; pushing is done with the App's token
     env:
       GH_REPO: ${{ github.repository }}
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}
       BRANCH: ${{ needs.plan.outputs.branch }}
     steps:
+      # A token of the bump-bot App, limited to this repository and to what
+      # the job does with it. It is handed only to the two steps that list
+      # and publish.
+      - name: Get a token for the bump-bot App
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.BUMP_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.BUMP_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
       # Every branch: whether the bump branch exists is read from what was
       # fetched.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           persist-credentials: false
       # For `go get` and `go mod tidy` only. No cache is restored into a job
       # that can write.
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: backend/go.mod
           cache: false
       # For scripts/readme-gateway-range.mjs only.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: upstream-plan
           path: /tmp/upstream
@@ -193,7 +208,7 @@ jobs:
       # is ours is decided by publish.py from isCrossRepository.
       - name: List the pull requests from the bump branch
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
           gh pr list --head "$BRANCH" --state all --limit 100 \
@@ -218,9 +233,9 @@ jobs:
 
       # `publish` runs `git push` and `gh` with the arguments the step above
       # chose, and nothing else. In a dry run it prints them.
-      - name: Push the branch, start CI and open the pull request
+      - name: Push the branch and open the pull request
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
           status=0
@@ -259,8 +274,8 @@ jobs:
       # proves it did not.
       GOFLAGS: -mod=readonly
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
@@ -334,7 +349,7 @@ jobs:
           $FOLLOW record-check --pull "$PULL" --stack "$STACK" --bff "$BFF" --compat "$COMPAT" \
             --out /tmp/upstream/check-a.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: upstream-check-a
           path: /tmp/upstream/check-a.json
@@ -370,12 +385,12 @@ jobs:
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: upstream-plan
           path: /tmp/upstream
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         # No result is a state the report handles: check A was skipped, or it
         # broke before it could record one.
         continue-on-error: true

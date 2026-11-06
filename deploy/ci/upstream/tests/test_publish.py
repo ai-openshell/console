@@ -74,12 +74,11 @@ class Blocked(unittest.TestCase):
 
 
 class Decide(unittest.TestCase):
-    def test_a_new_bump_is_pushed_ci_started_and_a_pull_request_opened(self):
+    def test_a_new_bump_is_pushed_and_a_pull_request_opened(self):
         decided = publish.build(plan_for(STABLE), created(), [], None, REPO_URL)
         self.assertIsNone(decided["skip"])
         self.assertEqual(decided["branch"], BRANCH)
         self.assertEqual(decided["push"], {"sha": NEW})
-        self.assertTrue(decided["dispatch"])
         self.assertEqual(decided["pr"]["title"], "fix: move to OpenShell 0.1.4")
         self.assertIn("will not touch it again", decided["pr"]["body"])
         self.assertEqual(decided["compare"], REPO_URL + "/compare/main...%s?expand=1" % BRANCH)
@@ -87,7 +86,7 @@ class Decide(unittest.TestCase):
     def test_a_blocked_bump_decides_nothing(self):
         decided = publish.build(plan_for(STABLE), created(), [pull()], None, REPO_URL)
         self.assertTrue(decided["skip"])
-        self.assertEqual((decided["push"], decided["dispatch"], decided["pr"]), (None, False, None))
+        self.assertEqual((decided["push"], decided["pr"]), (None, None))
 
     def test_a_move_that_changed_nothing_decides_nothing(self):
         outcome = {"action": "none", "reason": "main already pins OpenShell 0.1.4", "main": MAIN, "sha": None, "moved": None}
@@ -135,14 +134,13 @@ class Execute(unittest.TestCase):
     def decided(self):
         return publish.build(plan_for(STABLE), created(), [], None, REPO_URL)
 
-    def test_push_with_an_empty_lease_then_start_ci_then_open_the_pull_request(self):
+    def test_push_with_an_empty_lease_then_open_the_pull_request(self):
         github, notes, _, error = self.run_it(self.decided())
         self.assertIsNone(error)
         shown = github.shown()
-        self.assertEqual(len(shown), 3)
+        self.assertEqual(len(shown), 2)
         self.assertEqual(shown[0], "git push --force-with-lease=refs/heads/%s: origin %s:refs/heads/%s" % (BRANCH, NEW, BRANCH))
-        self.assertEqual(shown[1], "gh workflow run ci.yml --ref %s" % BRANCH)
-        self.assertTrue(shown[2].startswith("gh pr create --head %s --base main --title fix: move to OpenShell 0.1.4 --body-file " % BRANCH))
+        self.assertTrue(shown[1].startswith("gh pr create --head %s --base main --title fix: move to OpenShell 0.1.4 --body-file " % BRANCH))
         self.assertIn("Opened %s/pull/41." % REPO_URL, notes)
 
     def test_a_skip_runs_nothing(self):
@@ -191,7 +189,7 @@ class Execute(unittest.TestCase):
     def test_a_branch_that_appeared_meanwhile_stands_down_without_an_error(self):
         github, notes, _, error = self.run_it(self.decided(), fail={"push --force-with-lease": (1, "", "! [rejected] (stale info)")})
         self.assertIsNone(error)
-        self.assertEqual(len(github.commands), 1, "no CI and no pull request for a branch this run did not push")
+        self.assertEqual(len(github.commands), 1, "no pull request for a branch this run did not push")
         self.assertIn("appeared while this run was working", notes[0])
 
     def test_any_other_push_failure_is_an_error_and_nothing_follows(self):
@@ -199,28 +197,21 @@ class Execute(unittest.TestCase):
         self.assertIn("could not push %s" % BRANCH, str(error))
         self.assertEqual(len(github.commands), 1)
 
-    def test_a_refused_pull_request_is_an_error_that_gives_the_link_and_the_setting(self):
-        refusal = (1, "", "GraphQL: GitHub Actions is not permitted to create or approve pull requests")
-        github, _, _, error = self.run_it(self.decided(), fail={"gh pr create": refusal})
+    def test_a_refused_pull_request_is_an_error_that_gives_the_link(self):
+        github, _, _, error = self.run_it(self.decided(), fail={"gh pr create": (1, "", "HTTP 403: Resource not accessible by integration")})
         text = str(error)
-        self.assertIn("Allow GitHub Actions to create and approve pull requests", text)
         self.assertIn(REPO_URL + "/compare/main...%s?expand=1" % BRANCH, text)
         self.assertIn("The branch is pushed", text)
-        # CI was still started, and the branch is not taken away again.
-        self.assertIn("gh workflow run ci.yml --ref %s" % BRANCH, github.shown())
-        self.assertEqual([c for c in github.shown() if ":refs/heads/" in c and c.split()[-1].startswith(":")], [])
-
-    def test_ci_that_could_not_be_started_is_an_error_after_the_pull_request_is_opened(self):
-        github, _, _, error = self.run_it(self.decided(), fail={"gh workflow run": (1, "", "HTTP 403")})
-        self.assertIn("CI could not be started", str(error))
-        self.assertTrue(github.shown()[-1].startswith("gh pr create"))
+        self.assertIn("bump-bot App", text)
+        # The branch is not taken away again.
+        self.assertEqual(len(github.commands), 2)
 
     def test_a_dry_run_runs_nothing_and_says_what_it_would(self):
         github, notes, log, error = self.run_it(self.decided(), dry_run=True)
         self.assertIsNone(error)
         self.assertEqual(github.commands, [])
         self.assertEqual(notes, [])
-        self.assertEqual(len([line for line in log if line.startswith("would run: ")]), 3)
+        self.assertEqual(len([line for line in log if line.startswith("would run: ")]), 2)
 
 
 if __name__ == "__main__":

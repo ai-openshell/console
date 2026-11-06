@@ -7,17 +7,13 @@ name: CI
 #   release/X.Y   the line before it, for critical and security fixes
 #
 # A bump (follow-upstream.yml) is a pull request into main from the branch
-# bump/openshell-<version>, and this workflow running on it tests the move.
-# The bot opens that pull request with the workflow's default token, which
-# starts no workflow, so it starts this one by hand (workflow_dispatch) on the
-# branch. A run started that way publishes nothing: it is neither a push nor a
-# pull request.
+# bump/openshell-<version>, opened by the bump-bot App, and this workflow
+# running on it tests the move.
 on:
   push:
     branches: [main, "release/**"]
   pull_request:
     branches: [main, "release/**"]
-  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -50,15 +46,12 @@ jobs:
 
   # On a pull request the two check-* jobs do their work only when their half
   # of the tree changed. On a push, to main or to a release branch, they always
-  # do: that is the run a release is cut from. So do they on a run started by
-  # hand, which is how the bump bot runs CI on its branch: there is no pull
-  # request to compare with.
+  # do: that is the run a release is cut from.
   check-frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
-        if: github.event_name == 'pull_request'
         id: filter
         with:
           filters: |
@@ -66,20 +59,20 @@ jobs:
               - 'frontend/**'
               - 'package*.json'
       - uses: actions/setup-node@v4
-        if: steps.filter.outputs.frontend == 'true' || github.event_name != 'pull_request'
+        if: steps.filter.outputs.frontend == 'true' || github.event_name == 'push'
         with:
           node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
-      - if: steps.filter.outputs.frontend == 'true' || github.event_name != 'pull_request'
+      - if: steps.filter.outputs.frontend == 'true' || github.event_name == 'push'
         run: cd frontend && npm ci
-      - if: steps.filter.outputs.frontend == 'true' || github.event_name != 'pull_request'
+      - if: steps.filter.outputs.frontend == 'true' || github.event_name == 'push'
         run: cd frontend && npm run lint
-      - if: steps.filter.outputs.frontend == 'true' || github.event_name != 'pull_request'
+      - if: steps.filter.outputs.frontend == 'true' || github.event_name == 'push'
         run: cd frontend && npm run format:check
-      - if: steps.filter.outputs.frontend == 'true' || github.event_name != 'pull_request'
+      - if: steps.filter.outputs.frontend == 'true' || github.event_name == 'push'
         run: cd frontend && npm run typecheck
-      - if: steps.filter.outputs.frontend == 'true' || github.event_name != 'pull_request'
+      - if: steps.filter.outputs.frontend == 'true' || github.event_name == 'push'
         run: cd frontend && npm test -- --coverage --passWithNoTests
 
   check-backend:
@@ -87,23 +80,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
-        if: github.event_name == 'pull_request'
         id: filter
         with:
           filters: |
             backend:
               - 'backend/**'
       - uses: actions/setup-go@v5
-        if: steps.filter.outputs.backend == 'true' || github.event_name != 'pull_request'
+        if: steps.filter.outputs.backend == 'true' || github.event_name == 'push'
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
-      - if: steps.filter.outputs.backend == 'true' || github.event_name != 'pull_request'
+      - if: steps.filter.outputs.backend == 'true' || github.event_name == 'push'
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: backend
           version: v2.12.2
-      - if: steps.filter.outputs.backend == 'true' || github.event_name != 'pull_request'
+      - if: steps.filter.outputs.backend == 'true' || github.event_name == 'push'
         run: cd backend && go test -race -count=1 -coverprofile=coverage.out ./...
 
   e2e:

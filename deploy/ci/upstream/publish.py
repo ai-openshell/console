@@ -1,4 +1,4 @@
-"""Putting a bump on GitHub: the branch, a CI run on it, and its pull request.
+"""Putting a bump on GitHub: the branch and its pull request.
 
 Split in two on purpose.
 
@@ -25,7 +25,6 @@ import report
 
 BASE = report.BASE
 REMOTE = "origin"
-CI_WORKFLOW = "ci.yml"
 
 # Hands git the token for one command, from the environment: it is never
 # written to the git config and never appears on a command line.
@@ -85,7 +84,7 @@ def build(plan, outcome, pulls=None, branch_sha=None, repo_url=""):
     """Every step to take on GitHub for what the `bump` job prepared, as plain data."""
     target = plan.get("target") or {}
     branch = target.get("branch")
-    publish = {"branch": branch, "skip": None, "push": None, "dispatch": False, "pr": None, "compare": None}
+    publish = {"branch": branch, "skip": None, "push": None, "pr": None, "compare": None}
     publish["skip"] = blocked(plan, pulls, branch_sha)
     if publish["skip"]:
         return publish
@@ -94,7 +93,6 @@ def build(plan, outcome, pulls=None, branch_sha=None, repo_url=""):
         return publish
 
     publish["push"] = {"sha": outcome["sha"]}
-    publish["dispatch"] = True
     publish["pr"] = {"title": report.pr_title(target["version"]), "body": report.pr_body(plan, repo_url)}
     if repo_url:
         publish["compare"] = "%s/compare/%s...%s?expand=1" % (repo_url.rstrip("/"), BASE, branch)
@@ -185,35 +183,19 @@ def _steps(publish, call, dry_run):
     if not dry_run:
         notes.append("Pushed `%s` at %s." % (branch, push["sha"][:12]))
 
-    # A pull request opened with the workflow's default token starts no
-    # workflow, but a workflow_dispatch made with it does. The check runs
-    # attach to the commit, so they show on the pull request.
-    problems = []
-    if publish.get("dispatch"):
-        code, _, err = call(["gh", "workflow", "run", CI_WORKFLOW, "--ref", branch])
-        if code != 0:
-            problems.append(
-                "CI could not be started on `%s`:\n%s\nStart it from Actions > CI > Run workflow on that branch."
-                % (branch, err.strip())
-            )
-        elif not dry_run:
-            notes.append("Started CI on `%s`." % branch)
-
+    # Opened with the bump-bot App's token, the pull request starts CI like
+    # any other.
     pull = publish["pr"]
     code, out, err = call(
         ["gh", "pr", "create", "--head", branch, "--base", BASE, "--title", pull["title"], "--body-file", call.file(pull["body"])]
     )
     if code != 0:
-        problems.append(
+        raise PublishError(
             "GitHub refused to open the pull request %s -> %s:\n%s\n"
-            "With the workflow's default token that is what happens while the repository setting "
-            "'Allow GitHub Actions to create and approve pull requests' is off (Settings > Actions > "
-            "General > Workflow permissions). The branch is pushed; open the pull request by hand%s."
+            "The branch is pushed; open the pull request by hand%s. If this keeps happening, check that "
+            "the bump-bot App is installed on this repository with Pull requests: write."
             % (branch, BASE, err.strip(), ": " + publish["compare"] if publish.get("compare") else "")
         )
-    elif not dry_run:
+    if not dry_run:
         notes.append("Opened %s." % (out.strip() or "the pull request"))
-
-    if problems:
-        raise PublishError("\n\n".join(problems))
     return notes

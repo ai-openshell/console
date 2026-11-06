@@ -64,11 +64,8 @@ It runs once a day, and when a person starts it.
      `OpenShell-Release: X.Y.Z`, signed off, by `github-actions[bot]`.
    - Push the new branch. The push is refused if the branch appeared in the
      meantime.
-   - Start CI on it with `gh workflow run ci.yml --ref bump/openshell-X.Y.Z`.
-     A pull request opened with the workflow's token starts no workflow, but a
-     workflow run started with it does. Its checks attach to the commit and
-     show on the pull request.
-   - Open the pull request into `main`.
+   - Open the pull request into `main`. It is opened with the bump-bot App's
+     token, so CI runs on it like on anyone's pull request.
 3. **`check-a`.** Build the BFF from `main` as it is, start the target's
    gateway by digest, run the compatibility suite.
 4. **`report`.** A check A failure goes to one issue, labelled
@@ -82,8 +79,7 @@ It runs once a day, and when a person starts it.
 
 ## What the bot does and never does
 
-It creates a bump branch, starts CI on it and opens its pull request. That is
-all.
+It creates a bump branch and opens its pull request. That is all.
 
 - It never rebases, updates or force-pushes a bump branch. Once the branch
   exists it is an ordinary branch, and people push fixes to it.
@@ -92,7 +88,11 @@ all.
   ([docs/releasing.md](../../../docs/releasing.md)).
 - It never creates `release/X.Y`. A person does, before merging a bump that
   starts a new gateway minor.
-- It uses the workflow's default token, and no other.
+- It pushes and opens the pull request with a token of the organization's
+  bump-bot GitHub App, asked for with contents and pull requests write and
+  nothing else. The App's client ID and private key are the secrets
+  `BUMP_BOT_CLIENT_ID` and `BUMP_BOT_PRIVATE_KEY` in the `bump-bot`
+  environment, which only `main` can deploy to.
 
 ## Working on a bump
 
@@ -155,11 +155,11 @@ the template.
 | Job | Permissions | Runs |
 |---|---|---|
 | `plan` | `contents: read` | this directory's code, `git ls-remote`, registry lookups |
-| `bump` | `contents: write`, `pull-requests: write`, `actions: write` | git, `go get`, `go mod tidy`, the README script. No build, no test, no container |
+| `bump` | `contents: read`, plus the bump-bot App's token (contents and pull requests write) | git, `go get`, `go mod tidy`, `go list -m`, the README script. No build, no test, no container |
 | `check-a` | `contents: read` | upstream's gateway image, the BFF, the compat suite |
 | `report` | `contents: read`, `issues: write` | this directory's code and `gh issue` |
 
-In the `bump` job the token is handed only to the steps that look up pull
+In the `bump` job the App's token is handed only to the steps that look up pull
 requests from the branch and to `follow.py publish`, which runs `git push`
 and `gh` with the arguments the tokenless step before it chose and refuses
 anything else. The scripts it runs come from the commit the workflow runs at,
@@ -170,7 +170,10 @@ never from the tree it is changing. `tests/test_workflows.py` and
 
 | | Without it |
 |---|---|
-| *Allow GitHub Actions to create and approve pull requests* (Settings → Actions → General) | The branch is pushed and CI started, but the pull request cannot be opened. The run fails with the compare link, and a person opens the pull request from it |
+| The `bump-bot` environment, limited to `main`, with the secrets `BUMP_BOT_CLIENT_ID` and `BUMP_BOT_PRIVATE_KEY` | The `bump` job cannot get a token and fails. Plan, check A and the report still run |
+| The bump-bot App installed on this repository with Contents and Pull requests read/write | The token cannot push or open the pull request, and the run fails |
+
+*Allow GitHub Actions to create and approve pull requests* is not needed and stays off.
 
 The secret `UPSTREAM_BOT_TOKEN` and the variable `UPSTREAM_AUTOMERGE` are no
 longer read. Delete them.

@@ -210,9 +210,8 @@ class PullRequestBody(unittest.TestCase):
         self.assertIn(STABLE["target"]["gateway_image"], body)
         self.assertIn(REPO_URL + "/blob/main/.github/workflows/follow-upstream.yml", body)
 
-    def test_it_says_how_ci_started_and_that_merging_releases_nothing(self):
+    def test_it_says_merging_releases_nothing(self):
         body = " ".join(report.pr_body(STABLE).split())
-        self.assertIn("**CI** was started on this branch by the workflow", body)
         self.assertIn("cut a release by hand", body)
         self.assertNotIn("next", body.replace("next-version", ""))
 
@@ -236,11 +235,10 @@ class BumpSummary(unittest.TestCase):
         text = report.bump_summary(self.OUTCOME, {"skip": "pull request #7 (open) already came from `b`"})
         self.assertIn("Nothing done: pull request #7 (open) already came from `b`.", text)
 
-    def test_a_bump_lists_the_branch_ci_and_the_pull_request(self):
-        publish = {"skip": None, "branch": "bump/openshell-0.1.4", "dispatch": True, "pr": {"title": "fix: move to OpenShell 0.1.4"}}
+    def test_a_bump_lists_the_branch_and_the_pull_request(self):
+        publish = {"skip": None, "branch": "bump/openshell-0.1.4", "pr": {"title": "fix: move to OpenShell 0.1.4"}}
         text = report.bump_summary(self.OUTCOME, publish)
         self.assertIn("`bump/openshell-0.1.4` pushed: main at `aaaaaaaaaaaa` plus one commit, `cccccccccccc`.", text)
-        self.assertIn("CI started on it.", text)
         self.assertIn("A pull request into `main` opened: `fix: move to OpenShell 0.1.4`.", text)
         self.assertIn("would be pushed", report.bump_summary(self.OUTCOME, publish, dry_run=True))
 

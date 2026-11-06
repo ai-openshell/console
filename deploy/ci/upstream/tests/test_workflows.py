@@ -153,10 +153,17 @@ FOLLOW_JOBS = jobs(FOLLOW)
 CI_ALL_JOBS = jobs(CI)
 CI_JOBS = {name: lines for name, lines in CI_ALL_JOBS.items() if name in ("compat-pins", "stable-release", "compat")}
 
-TOKEN = "GH_TOKEN: ${{ github.token }}"
+TOKEN = "GH_TOKEN: ${{ steps.app-token.outputs.token }}"
+APP_TOKEN_STEP = "Get a token for the bump-bot App"
+PINNED = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}$")
+
+
+def action(uses):
+    """The action a `uses:` names, without the ref it is pinned to."""
+    return uses.split("@", 1)[0] if uses else None
 LIST = "List the pull requests from the bump branch"
 BUILD = "Make the bump commit"
-PUBLISH_STEP = "Push the branch, start CI and open the pull request"
+PUBLISH_STEP = "Push the branch and open the pull request"
 
 
 class ScannerSanity(unittest.TestCase):
@@ -172,7 +179,8 @@ class ScannerSanity(unittest.TestCase):
 
     def test_finds_the_steps(self):
         found = steps(FOLLOW_JOBS["bump"])
-        self.assertEqual(found[0]["uses"], "actions/checkout@v4")
+        self.assertEqual(action(found[0]["uses"]), "actions/create-github-app-token")
+        self.assertEqual(action(found[1]["uses"]), "actions/checkout")
         named = [step["name"] for step in found]
         for name in (LIST, BUILD, PUBLISH_STEP):
             self.assertIn(name, named)
@@ -241,7 +249,8 @@ class LeastPrivilege(unittest.TestCase):
         # Changing this table is the point at which a reviewer should ask why.
         expected = {
             "plan": {"contents": "read"},
-            "bump": {"contents": "write", "pull-requests": "write", "actions": "write"},
+            # It writes with the bump-bot App's token, not with this one.
+            "bump": {"contents": "read"},
             "check-a": {"contents": "read"},
             "report": {"contents": "read", "issues": "write"},
         }
@@ -254,9 +263,36 @@ class LeastPrivilege(unittest.TestCase):
             self.assertNotIn("secrets.", text, name)
             self.assertNotIn("github.token", text, name)
 
-    def test_no_job_is_handed_a_secret(self):
-        # Only the workflow's own token is used; there is no bot token.
-        self.assertNotIn("secrets.", FOLLOW)
+    def test_only_the_app_token_step_is_handed_a_secret(self):
+        holders = []
+        for name, lines in FOLLOW_JOBS.items():
+            for step in steps(lines):
+                if "secrets." in step["text"]:
+                    holders.append((name, step["name"]))
+        self.assertEqual(holders, [("bump", APP_TOKEN_STEP)])
+        self.assertNotIn("UPSTREAM_BOT_TOKEN", FOLLOW)
+
+    def test_the_app_secrets_come_from_an_environment_only_main_can_use(self):
+        self.assertIn("    environment: bump-bot", FOLLOW_JOBS["bump"])
+        for name, lines in FOLLOW_JOBS.items():
+            if name != "bump":
+                self.assertNotIn("environment:", "\n".join(lines), name)
+        step = [s for s in steps(FOLLOW_JOBS["bump"]) if s["name"] == APP_TOKEN_STEP][0]
+        self.assertIn("client-id: ${{ secrets.BUMP_BOT_CLIENT_ID }}", step["text"])
+        self.assertIn("private-key: ${{ secrets.BUMP_BOT_PRIVATE_KEY }}", step["text"])
+        # Asked for with what the job does and nothing more.
+        perms = sorted(re.findall(r"permission-([a-z-]+): (\w+)", step["text"]))
+        self.assertEqual(perms, [("contents", "write"), ("pull-requests", "write")])
+
+
+class ActionsArePinned(unittest.TestCase):
+    """The bump job holds a token that can push, so every action is a commit, not a tag."""
+
+    def test_every_action_in_follow_upstream_is_pinned_by_sha(self):
+        for name, lines in FOLLOW_JOBS.items():
+            for step in steps(lines):
+                if step["uses"]:
+                    self.assertRegex(step["uses"], PINNED, "%s: %s" % (name, step["uses"]))
 
     def test_ci_compat_jobs_are_read_only(self):
         for name, lines in CI_JOBS.items():
@@ -282,10 +318,16 @@ class TheJobThatCanWrite(unittest.TestCase):
         return [s for s in self.steps if s["name"] == name][0]
 
     def test_it_sets_up_two_toolchains_and_no_container(self):
-        used = [step["uses"] for step in self.steps if step["uses"]]
+        used = [action(step["uses"]) for step in self.steps if step["uses"]]
         self.assertEqual(
             used,
-            ["actions/checkout@v4", "actions/setup-go@v5", "actions/setup-node@v4", "actions/download-artifact@v4"],
+            [
+                "actions/create-github-app-token",
+                "actions/checkout",
+                "actions/setup-go",
+                "actions/setup-node",
+                "actions/download-artifact",
+            ],
         )
 
     def test_its_scripts_call_only_gh_and_this_repositorys_own_command_line(self):
@@ -311,16 +353,15 @@ class TheJobThatCanWrite(unittest.TestCase):
         self.assertEqual(pinmove.sdk_commands("0" * 40)[1], ["go", "mod", "tidy"])
 
     def test_the_checkout_keeps_no_credentials_and_fetches_everything(self):
-        checkout = self.steps[0]
-        self.assertEqual(checkout["uses"], "actions/checkout@v4")
+        checkout = [s for s in self.steps if action(s["uses"]) == "actions/checkout"][0]
         self.assertIn("persist-credentials: false", checkout["text"])
         self.assertIn("fetch-depth: 0", checkout["text"])
         self.assertNotIn("token:", checkout["text"])
 
     def test_no_cache_is_restored_into_it(self):
-        setup_go = [s for s in self.steps if s["uses"] == "actions/setup-go@v5"][0]
+        setup_go = [s for s in self.steps if action(s["uses"]) == "actions/setup-go"][0]
         self.assertIn("cache: false", setup_go["text"])
-        self.assertNotIn("cache:", [s for s in self.steps if s["uses"] == "actions/setup-node@v4"][0]["text"])
+        self.assertNotIn("cache:", [s for s in self.steps if action(s["uses"]) == "actions/setup-node"][0]["text"])
 
     def test_the_token_is_not_in_the_jobs_environment(self):
         env = job_env(self.lines)
@@ -329,11 +370,12 @@ class TheJobThatCanWrite(unittest.TestCase):
         self.assertNotIn("secrets.", env)
 
     def test_only_the_steps_that_list_and_publish_are_handed_the_token(self):
-        holders = [step for step in self.steps if "secrets." in step["text"] or "github.token" in step["text"]]
+        holders = [step for step in self.steps if "app-token.outputs.token" in step["text"] or "github.token" in step["text"]]
         self.assertEqual([step["name"] for step in holders], [LIST, PUBLISH_STEP])
         for step in holders:
             self.assertIn(TOKEN, step["env"])
-        self.assertEqual(self.text.count("github.token"), 2)
+        self.assertEqual(self.text.count("steps.app-token.outputs.token"), 2)
+        self.assertNotIn("github.token", self.text)
 
     def test_the_listing_step_runs_gh_pr_list_and_nothing_else(self):
         lines = commands(self.step(LIST)["scripts"][0])
@@ -536,24 +578,18 @@ class SideEffects(unittest.TestCase):
     def test_the_header_says_what_each_token_can_and_cannot_do(self):
         header = FOLLOW[: FOLLOW.index("\nname: Follow upstream")]
         flat = " ".join(header.replace("#", " ").split())
-        for phrase in ("default token", "workflow_dispatch", "create and approve pull requests"):
+        for phrase in ("bump-bot GitHub App", "`bump-bot` environment", "only `main` can deploy to", "starts CI"):
             self.assertIn(phrase, flat)
 
 
 class CiTestsThePinnedGateway(unittest.TestCase):
-    def test_ci_runs_for_main_and_release_branches_and_can_be_started_by_hand(self):
+    def test_ci_runs_for_main_and_release_branches(self):
         triggers = CI[CI.index("\non:\n") : CI.index("\nconcurrency:")]
         self.assertIn('  push:\n    branches: [main, "release/**"]\n', triggers)
         self.assertIn('  pull_request:\n    branches: [main, "release/**"]\n', triggers)
-        # The bump bot starts CI on its branch this way.
-        self.assertIn("  workflow_dispatch:\n", triggers)
         self.assertNotIn("next", triggers)
 
-    def test_a_run_started_by_hand_publishes_nothing(self):
-        self.assertIn(
-            "PUBLISH_IMAGE: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}",
-            CI,
-        )
+    def test_latest_and_the_dev_chart_come_from_main_only(self):
         for name in ("promote-latest", "publish-dev-chart"):
             self.assertIn("    if: github.event_name == 'push' && github.ref == 'refs/heads/main'", CI_ALL_JOBS[name])
 

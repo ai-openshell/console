@@ -254,7 +254,6 @@ class Bump(Cli):
         self.assertEqual(json.loads(self.repo.read(pinmove.PINS, outcome["sha"]))["release"], "0.1.4")
         self.assertEqual(decided["branch"], self.BRANCH)
         self.assertEqual(decided["push"], {"sha": outcome["sha"]})
-        self.assertTrue(decided["dispatch"])
         self.assertEqual(decided["pr"]["title"], "fix: move to OpenShell 0.1.4")
         self.assertEqual(decided["compare"], "https://github.com/o/r/compare/main...%s?expand=1" % self.BRANCH)
         self.assertIn("would be pushed", out)
@@ -268,7 +267,7 @@ class Bump(Cli):
             )
         self.assertEqual((code, err), (0, ""))
         self.assertIn("would run: git push --force-with-lease=refs/heads/%s: origin " % self.BRANCH, out)
-        self.assertIn("would run: gh workflow run ci.yml --ref %s" % self.BRANCH, out)
+        self.assertNotIn("gh workflow run", out)
         self.assertIn("would run: gh pr create --head %s --base main --title fix: move to OpenShell 0.1.4" % self.BRANCH, out)
         self.assertIsNone(self.repo.origin_branch(self.BRANCH))
 
@@ -321,7 +320,7 @@ class Bump(Cli):
 
 class PublishFailure(Cli):
     DECIDED = {
-        "branch": "bump/openshell-0.1.4", "skip": None, "push": {"sha": "c" * 40}, "dispatch": True,
+        "branch": "bump/openshell-0.1.4", "skip": None, "push": {"sha": "c" * 40},
         "pr": {"title": "fix: move to OpenShell 0.1.4", "body": "body\n"},
         "compare": "https://github.com/o/r/compare/main...bump/openshell-0.1.4?expand=1",
     }
@@ -334,21 +333,16 @@ class PublishFailure(Cli):
         self.assertIn("could not push bump/openshell-0.1.4", err)
         self.assertIn("**Publishing failed.**", self.read("published.md"))
 
-    def test_a_refused_pull_request_still_starts_ci_and_gives_the_link(self):
-        calls = []
-
+    def test_a_refused_pull_request_fails_with_the_link(self):
         def run(command, env=None):
-            calls.append(command)
             if command[:3] == ["gh", "pr", "create"]:
-                return 1, "", "GitHub Actions is not permitted to create or approve pull requests"
+                return 1, "", "HTTP 403: Resource not accessible by integration"
             return 0, "", ""
 
         plan_path = self.write("publish.json", self.DECIDED)
         with mock.patch.object(follow.publish_module, "run_command", run):
             code, _, err, _ = self.run_cli("publish", "--plan", plan_path)
         self.assertEqual(code, 1)
-        self.assertEqual([c[:3] for c in calls if c[0] == "gh"], [["gh", "workflow", "run"], ["gh", "pr", "create"]])
-        self.assertIn("Allow GitHub Actions to create and approve pull requests", err)
         self.assertIn(self.DECIDED["compare"], err)
 
 

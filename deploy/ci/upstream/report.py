@@ -150,9 +150,6 @@ def pr_body(plan, repo_url=""):
         ]
     lines += [
         "",
-        "**CI** was started on this branch by the workflow, because a pull request opened with the "
-        "workflow's token starts none by itself. Every push to the branch after this runs CI as usual.",
-        "",
         "**After it merges,** cut a release by hand: Actions > Publish > Run workflow on `main`.",
     ]
     return "\n".join(lines) + "\n"
@@ -354,8 +351,6 @@ def bump_summary(outcome, publish, dry_run=False):
         return "\n".join(lines) + "\n"
     lines.append("- %s %spushed: main at %s plus one commit, %s." % (
         _code(publish["branch"]), would, _code(outcome["main"][:12]), _code(outcome["sha"][:12])))
-    if publish.get("dispatch"):
-        lines.append("- CI %sstarted on it." % would)
     if publish.get("pr"):
         lines.append("- A pull request into `main` %sopened: %s." % (would, _code(publish["pr"]["title"])))
     return "\n".join(lines) + "\n"
