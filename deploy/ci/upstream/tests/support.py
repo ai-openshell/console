@@ -9,7 +9,7 @@ Nothing here opens a socket, starts a container or needs Go or Node:
     pins. That is enough for a conflict in one to be a real git conflict and
     for regenerating it to be a real resolution;
   * Repo is a real git repository on disk with a bare `origin`, because what
-    the `next` branch handling does is git, and only git can show it works.
+    making a bump branch does is git, and only git can show it works.
 """
 
 import atexit
@@ -74,7 +74,7 @@ def pins_of_2026_10_09():
     """What `main` pinned on 2026-10-09: OpenShell 0.1.3, with its real digests.
 
     A copy, on purpose. A test that read the checked-in pins file for its
-    values would fail on `next` the moment the workflow moved the pin there.
+    values would fail on a bump branch the moment the workflow moved the pin there.
     """
     return {
         "_comment": ["A fixture: main on 2026-10-09."],
@@ -159,8 +159,12 @@ def readme_block(doc):
 class FakeTools(object):
     """Runs in place of pinmove.run_command, and records what was asked of it."""
 
-    def __init__(self, fail=None, stray=None):
+    def __init__(self, fail=None, stray=None, tagged=None):
         self.calls = []
+        # {release commit: tag}: `go get` of that commit resolves to the SDK's
+        # own tag, as it does upstream from 0.1.7 on.
+        self.tagged = tagged or {}
+        self.tag_commits = {tag: commit for commit, tag in self.tagged.items()}
         self.fail = fail  # a command prefix that fails, e.g. ("go", "get")
         self.stray = stray  # a path `go mod tidy` also writes, which it must not
 
@@ -172,9 +176,14 @@ class FakeTools(object):
             module, _, commit = command[2].partition("@")
             path = os.path.join(cwd, "go.mod")
             text = _read(path)
-            text = re.sub(r"(?m)^\t%s \S+$" % re.escape(module), "\t%s %s" % (module, sdk_version(commit)), text)
+            version = self.tagged.get(commit) or sdk_version(commit)
+            text = re.sub(r"(?m)^\t%s \S+$" % re.escape(module), "\t%s %s" % (module, version), text)
             _write(path, text)
             return 0, ""
+        if command[:3] == ["go", "list", "-m"]:
+            # A tagged SDK: the module metadata names the commit the tag points at.
+            module, _, version = command[-1].partition("@")
+            return 0, json.dumps({"Path": module, "Version": version, "Origin": {"Hash": self.tag_commits.get(version, "")}})
         if command[:3] == ["go", "mod", "tidy"]:
             _write(os.path.join(cwd, "go.sum"), go_sum_for(_read(os.path.join(cwd, "go.mod"))))
             if self.stray:
@@ -332,26 +341,14 @@ class Repo(object):
         self.git("fetch", "-q", "origin")
         return sha
 
-    def on_next(self, message, files):
-        """Commit a person's work on top of origin/next and push it."""
-        self.git("fetch", "-q", "origin")
-        self.git("checkout", "-q", "-B", "next", "origin/next")
-        for path, text in files.items():
-            self.write(path, text)
-        sha = self.commit(message)
-        self.git("push", "-q", "--force", "origin", "next")
-        self.git("checkout", "-q", "main")
-        self.git("fetch", "-q", "origin")
-        return sha
-
-    def publish(self, sha):
-        """Put a prepared commit on origin/next, as the publish step would."""
-        self.git("push", "-q", "--force", "origin", "%s:refs/heads/next" % sha)
+    def push_branch(self, sha, name):
+        """Put a commit on origin as branch `name`, as a person or the publish step would."""
+        self.git("push", "-q", "--force", "origin", "%s:refs/heads/%s" % (sha, name))
         self.git("fetch", "-q", "origin")
 
-    def origin_next(self):
+    def origin_branch(self, name):
         self.git("fetch", "-q", "--prune", "origin")
         try:
-            return self.git("rev-parse", "--verify", "-q", "refs/remotes/origin/next")
+            return self.git("rev-parse", "--verify", "-q", "refs/remotes/origin/%s" % name)
         except subprocess.CalledProcessError:
             return None

@@ -1,6 +1,6 @@
 # Releasing
 
-A release is started by a person. Nobody chooses its version: it is worked out from the OpenShell release the branch is built on and the release tags that exist. Merging to `main` releases nothing, whatever the pull request is titled, with one exception: the merge of `next`, the move to a new OpenShell release ([The one automatic release](#the-one-automatic-release)).
+A release is started by a person. Nobody chooses its version: it is worked out from the OpenShell release the branch is built on and the release tags that exist. Merging to `main` releases nothing, whatever the pull request is titled, the move to a new OpenShell release included ([After a bump is merged](#after-a-bump-is-merged)).
 
 ## One version, three artifacts
 
@@ -65,19 +65,24 @@ Once `main` has moved to a new gateway minor, the line before it gets critical a
 gh workflow run publish.yml --ref release/0.1 -f dry_run=true
 ```
 
-Nothing is released from a release branch automatically, and three things differ:
+Three things differ:
 
 - **Only that line's `X.Y` image tag moves.** `latest` and the tag of `main`'s line do not.
 - **The branch has to pin its own line.** `release/0.1` with a pin on `0.2` is refused.
-- **The commit has to contain the newest release of its line.** The [Follow upstream](../.github/workflows/follow-upstream.yml) workflow creates `release/X.Y` from `main` before `next` merges, so for a while both are on one line. A release cut from `main` in the meantime is missing from the branch, and a release from the branch would be numbered above it without containing it. The run says so; merge that release into the branch first.
+- **The commit has to contain the newest release of its line.** A person creates `release/X.Y` from `main` before the bump to the next minor merges ([After a bump is merged](#after-a-bump-is-merged)), so for a while both are on one line. A release cut from `main` in the meantime is missing from the branch, and a release from the branch would be numbered above it without containing it. The run says so; merge that release into the branch first.
 
-### The one automatic release
+### After a bump is merged
 
-`main` moves to a new OpenShell release by merging `next`, which the [Follow upstream](../.github/workflows/follow-upstream.yml) workflow keeps one commit, the pin move, ahead of `main` ([ADR 0005](adrs/0005-gateway-compatibility-and-releases.md), decisions 7 and 8; [`deploy/ci/upstream/README.md`](../deploy/ci/upstream/README.md)). That merge changes what the next release is built on, and is the release most likely to be forgotten. So once it is merged and CI has passed on `main`, `publish.yml` releases it without being asked. Merge that pull request with *Rebase and merge*, so its commits land on `main` as they are.
+`main` moves to a new OpenShell release by merging a bump pull request, `bump/openshell-X.Y.Z`, which the [Follow upstream](../.github/workflows/follow-upstream.yml) workflow opens ([ADR 0005](adrs/0005-gateway-compatibility-and-releases.md), amendment of 2026-11-06; [`deploy/ci/upstream/README.md`](../deploy/ci/upstream/README.md)). The merge releases nothing. It changes what the next release is built on, so cut one once CI has passed on `main`, the same way as any other.
 
-Which commits qualify is decided from where they came from, never from their title ([`scripts/release/next-merge.mjs`](../scripts/release/next-merge.mjs)): the commit was merged into `main` by a pull request whose head was the branch `next` **in this repository**. A fork's branch of that name does not count, and neither does a pull request *into* `next`. Anything else is released by hand.
+Before merging a bump that starts a new gateway minor, create the release branch of the line `main` is leaving, if that line still needs patch releases:
 
-Its version is worked out the same way, and it carries every commit since the last release, including work people put on `next` because it needed the new gateway. It follows the merge only if CI passes for the commit `main` ends up on; if a second merge cancels that run, cut the release by hand.
+```sh
+git fetch origin
+git push origin origin/main:refs/heads/release/0.1
+```
+
+Nothing creates it for you.
 
 ## The pipeline
 
@@ -97,7 +102,7 @@ ci.yml ── build ──► push-manifest ────────────
    │                           └──► publish-dev-chart ──► chart 0.0.0-dev  (appVersion sha-<7>)
    │
    ▼
-publish.yml   started by a person, on main or release/X.Y   (or: CI passed for the merge of next)
+publish.yml   started by a person, on main or release/X.Y
    │
    ├── cut-release.mjs ── version = <pinned line>.<next patch>
    │        └── GitHub release vX.Y.Z ─────────► git tag vX.Y.Z
@@ -138,10 +143,10 @@ A running dashboard shows no version number: the image is built before a release
 
 **`Cut the release` refuses.** It says why, and nothing was created:
 
-- *The branch pins a pre-release.* Only `next` does; the release is cut after `next` has moved to the stable release and merged.
+- *The branch pins a pre-release.* Only a prep bump branch does, and it is not released; the release is cut after the bump to the stable release has merged.
 - *The release branch pins another line than its own.*
 - *The newest release of the line is not in this commit's history.* Either this is a second run for an old commit, and there is nothing to do, or `main` released past this release branch ([The line before `main`'s](#the-line-before-mains)).
-- *A counted release tag was not built for the line* (a real run only). Delete the tag and re-run the run; the merge of `next` is stopped and re-run the same way.
+- *A counted release tag was not built for the line* (a real run only). Delete the tag and re-run the run.
 
 **`Cut the release` failed while creating the release.** `gh`'s message is in the log. The release and its tag are created in one request, so *Re-run all jobs* either cuts the release or finds the tag and carries on.
 
@@ -157,7 +162,7 @@ A running dashboard shows no version number: the image is built before a release
 
 **`promote-latest` failed.** `latest` stays on the previous good commit and CI is red, so nothing is published. Re-run the job. If `main` has moved on, the re-run stands down and the newer commit's run promotes its own image.
 
-**An older run of `main` is re-run.** It cannot move `latest`. If its commit was merged from `next` and never released, it is released now, unless the line has a newer release that the commit does not contain; then the run is refused. CI runs on `main` share a concurrency group that cancels the run in progress, so the re-run cancels the newest run if that is still going, and its commit is neither promoted nor released until its own run is re-run.
+**An older run of `main` is re-run.** It cannot move `latest`, and it releases nothing. CI runs on `main` share a concurrency group that cancels the run in progress, so the re-run cancels the newest run if that is still going, and its commit is not promoted until its own run is re-run.
 
 ## Testing the release tooling
 

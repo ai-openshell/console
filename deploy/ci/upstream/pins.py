@@ -161,7 +161,7 @@ def validate(doc, schemas=None, go_mod_version=None):
         else:
             problems.append(
                 "release must be an upstream release X.Y.Z, or a pre-release X.Y.Z-pre.N on "
-                "`next`, without the leading v. Got %r." % (release,)
+                "a prep branch, without the leading v. Got %r." % (release,)
             )
 
     sdk = doc.get("sdk")
@@ -204,8 +204,9 @@ def validate(doc, schemas=None, go_mod_version=None):
 def require_stable(doc):
     """Problems, if this pins document may not merge into `main` or `release/**`.
 
-    Only a stable release is pinned there. `next` pins a pre-release by
-    definition, and is the only branch that does (ADR 0005, decision 6).
+    Only a stable release is pinned there. A prep branch, a bump to a
+    pre-release made by hand, is the only branch that pins one (ADR 0005,
+    amendment of 2026-11-06).
     """
     release = doc.get("release") if isinstance(doc, dict) else None
     if versions.parse(release) is None:
@@ -214,9 +215,9 @@ def require_stable(doc):
         return []
     return [
         "this branch pins OpenShell %s, a pre-release. `main` and `release/**` pin stable "
-        "releases only. This is how `next` looks until upstream releases %s: the pull request "
-        "stays open, and the upstream workflow re-pins it to the stable release, after which "
-        "this check passes. It says nothing about compatibility; the `compat` job does."
+        "releases only. This is a prep branch: it cannot merge until upstream releases %s, when "
+        "the upstream workflow opens a bump to the stable release. It says nothing about "
+        "compatibility; the `compat` job does."
         % (release, versions.base(release))
     ]
 

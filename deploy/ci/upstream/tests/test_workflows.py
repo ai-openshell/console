@@ -7,8 +7,7 @@ here: every PR runs this file from ci.yml's compat-pins job.
 There is no YAML parser in the standard library, so this reads the files by
 indentation. That is enough for the handful of facts it needs, and it only
 looks at what this directory owns: all of follow-upstream.yml, the triggers
-and the compat jobs of ci.yml, and the one step of publish.yml that asks where
-a commit came from.
+and the compat jobs of ci.yml, and the triggers of publish.yml.
 """
 
 import os
@@ -154,17 +153,17 @@ FOLLOW_JOBS = jobs(FOLLOW)
 CI_ALL_JOBS = jobs(CI)
 CI_JOBS = {name: lines for name, lines in CI_ALL_JOBS.items() if name in ("compat-pins", "stable-release", "compat")}
 
-TOKEN = "GH_TOKEN: ${{ secrets.UPSTREAM_BOT_TOKEN || github.token }}"
-LIST = "List the pull requests from next"
-BUILD = "Build what next should be"
-PUBLISH_STEP = "Push next and keep its pull request"
+TOKEN = "GH_TOKEN: ${{ github.token }}"
+LIST = "List the pull requests from the bump branch"
+BUILD = "Make the bump commit"
+PUBLISH_STEP = "Push the branch, start CI and open the pull request"
 
 
 class ScannerSanity(unittest.TestCase):
     """If the scanner found nothing, every test below would pass for no reason."""
 
     def test_finds_the_jobs(self):
-        self.assertEqual(sorted(FOLLOW_JOBS), ["check-a", "next", "plan", "report"])
+        self.assertEqual(sorted(FOLLOW_JOBS), ["bump", "check-a", "plan", "report"])
         self.assertEqual(sorted(CI_JOBS), ["compat", "compat-pins", "stable-release"])
 
     def test_finds_the_scripts(self):
@@ -172,13 +171,13 @@ class ScannerSanity(unittest.TestCase):
         self.assertGreaterEqual(sum(len(run_scripts(lines)) for lines in CI_JOBS.values()), 8)
 
     def test_finds_the_steps(self):
-        found = steps(FOLLOW_JOBS["next"])
+        found = steps(FOLLOW_JOBS["bump"])
         self.assertEqual(found[0]["uses"], "actions/checkout@v4")
         named = [step["name"] for step in found]
         for name in (LIST, BUILD, PUBLISH_STEP):
             self.assertIn(name, named)
         self.assertIn("GH_TOKEN", [s for s in found if s["name"] == PUBLISH_STEP][0]["env"])
-        self.assertIn("HAS_BOT_TOKEN:", job_env(FOLLOW_JOBS["next"]))
+        self.assertIn("BRANCH:", job_env(FOLLOW_JOBS["bump"]))
 
     def test_reads_block_and_inline_scripts(self):
         lines = [
@@ -242,7 +241,7 @@ class LeastPrivilege(unittest.TestCase):
         # Changing this table is the point at which a reviewer should ask why.
         expected = {
             "plan": {"contents": "read"},
-            "next": {"contents": "write", "pull-requests": "write"},
+            "bump": {"contents": "write", "pull-requests": "write", "actions": "write"},
             "check-a": {"contents": "read"},
             "report": {"contents": "read", "issues": "write"},
         }
@@ -255,10 +254,9 @@ class LeastPrivilege(unittest.TestCase):
             self.assertNotIn("secrets.", text, name)
             self.assertNotIn("github.token", text, name)
 
-    def test_only_the_next_job_is_handed_the_bot_token(self):
-        for name, lines in FOLLOW_JOBS.items():
-            if name != "next":
-                self.assertNotIn("secrets.", "\n".join(lines), name)
+    def test_no_job_is_handed_a_secret(self):
+        # Only the workflow's own token is used; there is no bot token.
+        self.assertNotIn("secrets.", FOLLOW)
 
     def test_ci_compat_jobs_are_read_only(self):
         for name, lines in CI_JOBS.items():
@@ -266,7 +264,7 @@ class LeastPrivilege(unittest.TestCase):
 
 
 class TheJobThatCanWrite(unittest.TestCase):
-    """`next` holds contents: write and pull-requests: write, so it runs nothing foreign.
+    """`bump` can push a branch, open a pull request and start a workflow, so it runs nothing foreign.
 
     check-a may run upstream's gateway image because the worst it can do is
     read a public repository. This job could push to main (there is no branch
@@ -276,7 +274,7 @@ class TheJobThatCanWrite(unittest.TestCase):
     """
 
     def setUp(self):
-        self.lines = FOLLOW_JOBS["next"]
+        self.lines = FOLLOW_JOBS["bump"]
         self.steps = steps(self.lines)
         self.text = "\n".join(self.lines)
 
@@ -292,9 +290,9 @@ class TheJobThatCanWrite(unittest.TestCase):
 
     def test_its_scripts_call_only_gh_and_this_repositorys_own_command_line(self):
         allowed = re.compile(
-            r"^(set -euo pipefail$|\$FOLLOW (next|publish) |gh pr list |status=0$|"
-            r"cat /tmp/upstream/next/[a-z]+\.md >> \"\$GITHUB_STEP_SUMMARY\"$|"
-            r"if \[ -f /tmp/upstream/next/published\.md \]; then$|fi$|exit \"\$status\"$)"
+            r"^(set -euo pipefail$|\$FOLLOW (bump|publish) |gh pr list |status=0$|"
+            r"cat /tmp/upstream/bump/[a-z]+\.md >> \"\$GITHUB_STEP_SUMMARY\"$|"
+            r"if \[ -f /tmp/upstream/bump/published\.md \]; then$|fi$|exit \"\$status\"$)"
         )
         for step in self.steps:
             for script in step["scripts"]:
@@ -328,34 +326,31 @@ class TheJobThatCanWrite(unittest.TestCase):
         env = job_env(self.lines)
         self.assertNotIn("GH_TOKEN", env)
         self.assertNotIn("github.token", env)
-        # The one mention of the secret at job level is a comparison that
-        # yields 'true' or 'false', never the value.
-        mentions = [line.strip() for line in env.splitlines() if "secrets." in line and not line.strip().startswith("#")]
-        self.assertEqual(mentions, ["HAS_BOT_TOKEN: ${{ secrets.UPSTREAM_BOT_TOKEN != '' }}"])
+        self.assertNotIn("secrets.", env)
 
     def test_only_the_steps_that_list_and_publish_are_handed_the_token(self):
         holders = [step for step in self.steps if "secrets." in step["text"] or "github.token" in step["text"]]
         self.assertEqual([step["name"] for step in holders], [LIST, PUBLISH_STEP])
         for step in holders:
             self.assertIn(TOKEN, step["env"])
-        self.assertEqual(self.text.count("secrets.UPSTREAM_BOT_TOKEN || github.token"), 2)
+        self.assertEqual(self.text.count("github.token"), 2)
 
     def test_the_listing_step_runs_gh_pr_list_and_nothing_else(self):
         lines = commands(self.step(LIST)["scripts"][0])
         self.assertEqual(lines[0], "set -euo pipefail")
-        self.assertEqual(len(lines), 3)
-        for line in lines[1:]:
-            self.assertTrue(line.startswith("gh pr list --head next --base main --state "), line)
-            # Which pull request is ours is decided in tested code, from this field.
-            self.assertIn("isCrossRepository", line)
-            self.assertIn("headRefOid", line)
-            self.assertNotIn("--jq", line)
-            self.assertRegex(line, r"> /tmp/upstream/(open|merged)\.json$")
+        self.assertEqual(len(lines), 2)
+        line = lines[1]
+        # Every state: a closed or merged pull request stops the bot as well.
+        self.assertTrue(line.startswith('gh pr list --head "$BRANCH" --state all '), line)
+        # Which pull request is ours is decided in tested code, from this field.
+        self.assertIn("isCrossRepository", line)
+        self.assertNotIn("--jq", line)
+        self.assertRegex(line, r"> /tmp/upstream/pulls\.json$")
 
     def test_the_publishing_step_runs_publish_and_nothing_else(self):
         script = self.step(PUBLISH_STEP)["scripts"][0]
-        self.assertIn('$FOLLOW publish --plan /tmp/upstream/next/publish.json --dry-run "$DRY_RUN"', re.sub(r"\\\n\s*", "", script))
-        for word in ("$FOLLOW next", "git ", "gh ", "go ", "node", "python"):
+        self.assertIn('$FOLLOW publish --plan /tmp/upstream/bump/publish.json --dry-run "$DRY_RUN"', re.sub(r"\\\n\s*", "", script))
+        for word in ("$FOLLOW bump", "git ", "gh ", "go ", "node", "python"):
             self.assertNotIn(word, script)
 
     def test_the_step_that_reaches_the_network_for_modules_has_no_token(self):
@@ -373,23 +368,24 @@ class TheJobThatCanWrite(unittest.TestCase):
         script = re.sub(r"\\\n\s*", "", self.step(BUILD)["scripts"][0])
         for flag in (
             "--plan /tmp/upstream/plan.json",
-            "--open-prs /tmp/upstream/open.json",
-            "--merged-prs /tmp/upstream/merged.json",
-            '--has-bot-token "$HAS_BOT_TOKEN"',
-            '--automerge "$AUTOMERGE"',
+            "--pulls /tmp/upstream/pulls.json",
             '--repo-url "$REPO_URL"',
             '--dry-run "$DRY_RUN"',
         ):
             self.assertIn(flag, script)
 
-    def test_auto_merge_is_off_unless_the_repository_variable_says_true(self):
-        self.assertIn("AUTOMERGE: ${{ vars.UPSTREAM_AUTOMERGE == 'true' }}", job_env(self.lines))
-        # The workflow never merges by itself. publish.py asks GitHub to turn
-        # auto-merge on, with a GraphQL mutation and never with `gh pr merge`,
-        # behind the flag this variable sets.
+    def test_it_runs_only_when_the_plan_says_bump(self):
+        self.assertIn("    if: needs.plan.outputs.bump == 'true'", self.lines)
+
+    def test_nothing_merges_and_nothing_turns_auto_merge_on(self):
+        self.assertNotIn("UPSTREAM_AUTOMERGE", self.text)
         for script in run_scripts(self.lines):
             self.assertNotIn("pr merge", script)
             self.assertNotIn("--auto ", script)
+        import publish
+        source = open(publish.__file__, encoding="utf-8").read()
+        for word in ("pr merge", "enablePullRequestAutoMerge", "pr close", '"--force"'):
+            self.assertNotIn(word, source)
 
     def test_a_failed_publish_still_writes_its_summary_and_still_fails(self):
         script = self.step(PUBLISH_STEP)["scripts"][0]
@@ -478,12 +474,20 @@ class SideEffects(unittest.TestCase):
         self.assertIn("        type: boolean", dispatch)
         self.assertIn("        default: true", dispatch)
 
-    def test_it_runs_every_hour_off_the_top_of_the_hour(self):
+    def test_it_runs_once_a_day_off_the_top_of_the_hour(self):
         crons = re.findall(r'^    - cron: "([^"]+)"$', FOLLOW, re.M)
         self.assertEqual(len(crons), 1)
         minute, hour, day, month, weekday = crons[0].split()
-        self.assertEqual((hour, day, month, weekday), ("*", "*", "*", "*"))
+        self.assertEqual((day, month, weekday), ("*", "*", "*"))
+        self.assertTrue(hour.isdigit(), hour)
         self.assertTrue(minute.isdigit() and 0 < int(minute) < 60, minute)
+
+    def test_a_version_can_be_asked_for_and_reaches_the_plan_through_env(self):
+        dispatch = FOLLOW[FOLLOW.index("  workflow_dispatch:") : FOLLOW.index("\npermissions: {}")]
+        self.assertIn("      version:", dispatch)
+        plan = "\n".join(FOLLOW_JOBS["plan"])
+        self.assertIn("VERSION: ${{ inputs.version }}", plan)
+        self.assertIn('--version "$VERSION"', "\n".join(run_scripts(FOLLOW_JOBS["plan"])))
 
     def test_every_step_that_writes_is_told_about_the_dry_run(self):
         plan_script = re.sub(r"\\\n\s*", "", "\n".join(run_scripts(FOLLOW_JOBS["plan"])))
@@ -511,7 +515,7 @@ class SideEffects(unittest.TestCase):
             "    if: ${{ github.event_name != 'schedule' || !github.event.repository.fork }}", FOLLOW_JOBS["plan"]
         )
         # Every other job needs the plan, so skipping it skips them all.
-        for name in ("next", "check-a"):
+        for name in ("bump", "check-a"):
             self.assertIn("    needs: plan", FOLLOW_JOBS[name])
         self.assertIn("needs.plan.result == 'success'", "\n".join(FOLLOW_JOBS["report"]))
 
@@ -531,15 +535,27 @@ class SideEffects(unittest.TestCase):
 
     def test_the_header_says_what_each_token_can_and_cannot_do(self):
         header = FOLLOW[: FOLLOW.index("\nname: Follow upstream")]
-        for phrase in ("UPSTREAM_BOT_TOKEN", "UPSTREAM_AUTOMERGE", "create and approve pull requests", "Workflows read/write"):
-            self.assertIn(phrase, header)
+        flat = " ".join(header.replace("#", " ").split())
+        for phrase in ("default token", "workflow_dispatch", "create and approve pull requests"):
+            self.assertIn(phrase, flat)
 
 
 class CiTestsThePinnedGateway(unittest.TestCase):
-    def test_ci_runs_for_main_next_and_release_branches(self):
+    def test_ci_runs_for_main_and_release_branches_and_can_be_started_by_hand(self):
         triggers = CI[CI.index("\non:\n") : CI.index("\nconcurrency:")]
         self.assertIn('  push:\n    branches: [main, "release/**"]\n', triggers)
-        self.assertIn('  pull_request:\n    branches: [main, next, "release/**"]\n', triggers)
+        self.assertIn('  pull_request:\n    branches: [main, "release/**"]\n', triggers)
+        # The bump bot starts CI on its branch this way.
+        self.assertIn("  workflow_dispatch:\n", triggers)
+        self.assertNotIn("next", triggers)
+
+    def test_a_run_started_by_hand_publishes_nothing(self):
+        self.assertIn(
+            "PUBLISH_IMAGE: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}",
+            CI,
+        )
+        for name in ("promote-latest", "publish-dev-chart"):
+            self.assertIn("    if: github.event_name == 'push' && github.ref == 'refs/heads/main'", CI_ALL_JOBS[name])
 
     def test_validates_the_pins_file_against_go_mod_and_runs_these_tests(self):
         scripts = run_scripts(CI_JOBS["compat-pins"])
@@ -573,10 +589,8 @@ class CiTestsThePinnedGateway(unittest.TestCase):
         self.assertNotIn("require-stable", "\n".join(CI_JOBS["compat"] + CI_JOBS["compat-pins"]))
         self.assertNotIn("needs:", "\n".join(job), "it does not wait for, or hide behind, another job")
 
-    def test_it_runs_for_main_and_release_branches_and_not_for_a_pull_request_into_next(self):
-        self.assertIn(
-            "    if: github.event_name == 'push' || github.base_ref != 'next'", CI_JOBS["stable-release"]
-        )
+    def test_it_runs_on_every_event_with_no_exception(self):
+        self.assertFalse([line for line in CI_JOBS["stable-release"] if line.startswith("    if:")])
 
     def test_latest_is_promoted_only_from_main_and_only_past_both_checks(self):
         promote = "\n".join(CI_ALL_JOBS["promote-latest"])
@@ -585,7 +599,7 @@ class CiTestsThePinnedGateway(unittest.TestCase):
         for job in ("stable-release", "compat", "release-tooling", "check-backend"):
             self.assertIn("        %s," % job, needs)
 
-    def test_a_pull_request_into_next_still_gets_its_images(self):
+    def test_a_pull_request_from_this_repository_gets_its_images(self):
         # The build and its manifest are not limited by base branch; only by
         # the head being in this repository, which is what has the registry login.
         for name in ("build", "push-manifest"):
@@ -611,15 +625,21 @@ class TheSweepIsRetired(unittest.TestCase):
             self.assertIsNone(re.search(r"\.lanes\b|\.floor\b|floor_release|matrix\.required", text))
 
 
-class AutomaticRelease(unittest.TestCase):
-    def test_publish_asks_whether_the_commit_was_merged_from_next_and_releases_it(self):
-        self.assertIn('node scripts/release/next-merge.mjs --sha "$sha" --repo "$REPO"', PUBLISH)
-        plan_step = PUBLISH[PUBLISH.index("next-merge.mjs --sha") :]
-        # It decides that the merge is released, not what the release is
-        # numbered: the version is worked out from the pinned release and the
-        # tags (scripts/release/next-version.mjs).
-        self.assertIn('release="true"', plan_step[: plan_step.index("} >> \"$GITHUB_OUTPUT\"")])
-        self.assertNotIn("release_type", PUBLISH)
+class NoAutomaticRelease(unittest.TestCase):
+    def test_publish_is_started_by_a_person_only(self):
+        self.assertNotIn("workflow_run", PUBLISH)
+        self.assertNotIn("next-merge", PUBLISH)
+        self.assertIn("  workflow_dispatch:", PUBLISH)
+
+    def test_the_next_machinery_is_gone(self):
+        for path in (
+            ("deploy", "ci", "upstream", "nextbranch.py"),
+            ("scripts", "release", "next-merge.mjs"),
+        ):
+            self.assertFalse(os.path.exists(os.path.join(support.REPO_ROOT, *path)), path)
+        for name, text in (("ci.yml", CI), ("follow-upstream.yml", FOLLOW), ("publish.yml", PUBLISH)):
+            for gone in ("UPSTREAM_BOT_TOKEN", "UPSTREAM_AUTOMERGE", "refs/heads/next", "--head next"):
+                self.assertNotIn(gone, text, "%s still mentions %s" % (name, gone))
 
 
 class StackScript(unittest.TestCase):

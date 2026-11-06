@@ -44,8 +44,9 @@ export const LINE_SOURCE_PATH = join(repoRoot, LINE_SOURCE_FILE);
 export const LINE_CONSTANT = 'BuiltInGatewayReleaseLine';
 
 // What a branch may pin: a stable release X.Y.Z, or a pre-release X.Y.Z-pre.N.
-// Only `next` pins a pre-release, and CI refuses one in a pull request into
-// any other branch (deploy/ci/upstream/follow.py require-stable). Upstream
+// Only a bump branch prepared ahead of an upstream release pins a
+// pre-release, and CI refuses one in every pull request
+// (deploy/ci/upstream/follow.py require-stable), so it never merges. Upstream
 // also publishes dev builds (0.1.3-dev.84); a dev gateway pulls a moving
 // sandbox image at runtime, so nothing is ever declared to be tested on one.
 const RELEASE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-pre\.(0|[1-9]\d*))?$/;
@@ -64,7 +65,7 @@ export function deriveGatewayLine(pins) {
   if (typeof release !== 'string' || !RELEASE.test(release)) {
     throw new Error(
       `"release" is ${JSON.stringify(release)}, which is not an OpenShell release ` +
-        '(X.Y.Z, or X.Y.Z-pre.N on next). A release line can only be declared from the ' +
+        '(X.Y.Z, or X.Y.Z-pre.N on a bump branch). A release line can only be declared from the ' +
         'release this branch is built on; a dev build is never pinned.',
     );
   }
@@ -155,7 +156,7 @@ function check(declared, pinsPath) {
         `  If the gateway started a new minor release line and this branch is moving to it, set ` +
         `${LINE_CONSTANT} = ${JSON.stringify(declared.line)} in the same change that moves the pin, ` +
         'and run `node scripts/readme-gateway-range.mjs --write`. The Follow upstream workflow does ' +
-        'both when it moves `next`. Moving to a new line is a minor release of the dashboard (ADR 0005).\n' +
+        'both in the bump it opens. Moving to a new line is a minor release of the dashboard (ADR 0005).\n' +
         '  If the pin moved by mistake, move it back: a patch release of the gateway never changes the line.',
     );
   }

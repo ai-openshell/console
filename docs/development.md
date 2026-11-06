@@ -125,4 +125,4 @@ const features = useFeatureFlags();
 
 ## Branches and the pinned OpenShell release
 
-A branch is built on one OpenShell release, which `deploy/ci/gateway-pins.json` names: `main` on a stable release, `next` on the upcoming one. Which branch a change goes to is in [CONTRIBUTING.md](../CONTRIBUTING.md#where-a-pull-request-goes), and how the pinned release moves is in [`deploy/ci/upstream/README.md`](../deploy/ci/upstream/README.md).
+A branch is built on one OpenShell release, which `deploy/ci/gateway-pins.json` names: `main` on a stable release, a bump branch (`bump/openshell-X.Y.Z`) on the release it moves to. Which branch a change goes to is in [CONTRIBUTING.md](../CONTRIBUTING.md#where-a-pull-request-goes), and how the pinned release moves is in [`deploy/ci/upstream/README.md`](../deploy/ci/upstream/README.md).

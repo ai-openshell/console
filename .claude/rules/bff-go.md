@@ -191,12 +191,13 @@ answers a request without a bearer with `unauthorized` (`pkg/auth/proxy.go`).
 The SDK is pinned to the commit of an OpenShell **release tag** and moves
 together with the gateway the branch pins, in one commit (ADR 0005, decision 7;
 hard facts 17 and 20 in `openshell-api.md`). The Follow upstream workflow makes
-that commit, on the `next` branch: never make it by hand, and never
-`go get ...@latest` or a branch. A person does the work the move makes
-necessary, in a pull request into `next`: the call sites and the test doubles
-in `mock_sdk_test.go` when `check-backend` is red on the `next` pull request,
-and the dashboard itself when `compat` is red there or the issue labelled
-`compat-migrate` is open. How the workflow works is in
+that commit, on a `bump/openshell-X.Y.Z` branch with a pull request into
+`main`: never make it by hand, and never `go get ...@latest` or a branch. The
+bot creates the branch and never touches it again. A person does the work the
+move makes necessary, pushed to that bump branch: the call sites and the test
+doubles in `mock_sdk_test.go` when `check-backend` is red on the bump pull
+request, and the dashboard itself when `compat` is red there or the issue
+labelled `compat-migrate` is open. How the workflow works is in
 [deploy/ci/upstream/README.md](../../deploy/ci/upstream/README.md).
 
 To inspect an RPC or a type, read the SDK package (`openshell/v1`, `types/*`)

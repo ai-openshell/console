@@ -3,14 +3,8 @@
 # A release is started by hand: run this workflow on main, or on a
 # release/<major>.<minor> branch, and leave "dry run" ticked to see the version
 # and the notes first; run it again with "dry run" cleared to publish. Merging
-# a pull request never publishes anything by itself, whatever its title says.
-#
-# The one exception is the move to a new OpenShell release, which reaches main
-# as the pull request from the `next` branch (follow-upstream.yml). Once it is
-# merged and CI has passed on main, this workflow releases it without being
-# asked: that release is the point of the pull request and the one most likely
-# to be forgotten. Which commits qualify is decided from where they came from,
-# not from their title; see scripts/release/next-merge.mjs.
+# a pull request never publishes anything by itself, whatever its title says,
+# and that includes the pull request that moves to a new OpenShell release.
 #
 # Nobody chooses the version (ADR 0005, decision 11). The dashboard shares the
 # gateway's minor release line, so a release is <line>.<n>: the line of the
@@ -41,12 +35,6 @@ on:
         description: "Dry run: show the version and the notes, publish nothing"
         type: boolean
         default: true
-  # Only for a merged pull request from `next`; every other CI run that
-  # finishes on main ends this workflow without releasing.
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
 
 concurrency:
   group: publish
@@ -55,33 +43,15 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Two ways in:
-    #
-    #   workflow_dispatch  a maintainer asked for a release, on main or on a
-    #                      release/<major>.<minor> branch. The exact shape of
-    #                      the branch name, and that a release branch pins its
-    #                      own line, is checked by cut-release.mjs.
-    #   workflow_run       CI passed for a PUSH to main in THIS repository.
-    #                      Releases only if that push is the merge of `next`.
-    #
-    # The event and repository checks are not redundant. `branches: [main]`
-    # above matches the head branch NAME of the run that finished, so a pull
-    # request opened from a fork's own `main` branch also arrives here with
-    # head_branch == 'main'. Without them this job — which can write to the
-    # repository — would check out and run that fork's code.
+    # A maintainer asked for a release, on main or on a
+    # release/<major>.<minor> branch. The exact shape of the branch name, and
+    # that a release branch pins its own line, is checked by cut-release.mjs.
     if: >
-      (github.event_name == 'workflow_dispatch' &&
-       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))) ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
+      github.event_name == 'workflow_dispatch' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
     permissions:
       # To create the release, and the tag with it.
       contents: write
-      # To ask whether the commit was merged from `next`.
-      pull-requests: read
       # To ask whether CI passed for the commit a person wants to release.
       actions: read
     outputs:
@@ -92,9 +62,8 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          # For workflow_run, publish exactly the commit whose CI completed.
-          # For manual runs, publish the tip of the branch it was started on.
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          # The tip of the branch the run was started on.
+          ref: ${{ github.sha }}
           # Full history and every tag: the version is worked out from the
           # tags, the notes from the history, and the step after reads both.
           fetch-depth: 0
@@ -104,54 +73,36 @@ jobs:
         with:
           node-version: '22.14.0'
 
-      # Decides whether this run releases, before anything else runs. It does
-      # not decide which version: nobody does (cut-release.mjs works it out).
+      # Checks the run before anything else runs. It does not decide which
+      # version: nobody does (cut-release.mjs works it out).
       #
-      #   asked for by a person   yes; a dry run unless they cleared the box. A
-      #                           real release also needs CI to have passed for
-      #                           this commit: the image the release tags is
-      #                           the one that CI run built. A commit is asked
-      #                           about, not a branch: a release branch that was
-      #                           just created points at a commit main's CI
-      #                           already built and tested.
-      #   CI finished on main     only when the commit was merged from the
-      #                           `next` branch of this repository. Anything
-      #                           else: nothing, and the job ends green.
+      # A dry run unless the person cleared the box. A real release also needs
+      # CI to have passed for this commit: the image the release tags is the
+      # one that CI run built. A commit is asked about, not a branch: a release
+      # branch that was just created points at a commit main's CI already
+      # built and tested.
       - name: Does this run release?
         id: plan
         env:
-          EVENT: ${{ github.event_name }}
-          BRANCH: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
+          BRANCH: ${{ github.ref_name }}
           DRY_RUN: ${{ inputs.dry_run }}
           REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           sha="$(git rev-parse HEAD)"
-          release="false"
-          dry_run="false"
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            release="true"
-            dry_run="$DRY_RUN"
-            green="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$sha&event=push&status=success&per_page=1" --jq '.total_count')"
-            if [ "$green" -lt 1 ]; then
-              if [ "$dry_run" = "true" ]; then
-                echo "::warning::CI has not passed for $sha. This dry run goes ahead; a real release of this commit would be refused."
-              else
-                echo "::error::CI has not passed for $sha, so there is no tested image to release. Wait for CI, or fix it, then run this again."
-                exit 1
-              fi
-            fi
-            echo "Asked for by a person, on $BRANCH$([ "$dry_run" = "true" ] && echo ' (dry run)')." | tee -a "$GITHUB_STEP_SUMMARY"
-          else
-            from="$(node scripts/release/next-merge.mjs --sha "$sha" --repo "$REPO" | sed -n 's/^from=//p')"
-            if [ -n "$from" ]; then
-              release="true"
-              echo "Merged from $from, the move to a new OpenShell release: releasing it." | tee -a "$GITHUB_STEP_SUMMARY"
+          release="true"
+          dry_run="$DRY_RUN"
+          green="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$sha&event=push&status=success&per_page=1" --jq '.total_count')"
+          if [ "$green" -lt 1 ]; then
+            if [ "$dry_run" = "true" ]; then
+              echo "::warning::CI has not passed for $sha. This dry run goes ahead; a real release of this commit would be refused."
             else
-              echo "CI passed for $sha, which was not merged from next. Nothing is released automatically; a release is started by hand (docs/releasing.md)." | tee -a "$GITHUB_STEP_SUMMARY"
+              echo "::error::CI has not passed for $sha, so there is no tested image to release. Wait for CI, or fix it, then run this again."
+              exit 1
             fi
           fi
+          echo "Asked for by a person, on $BRANCH$([ "$dry_run" = "true" ] && echo ' (dry run)')." | tee -a "$GITHUB_STEP_SUMMARY"
           {
             echo "release=$release"
             echo "dry_run=$dry_run"
@@ -182,9 +133,8 @@ jobs:
 
       # "Was a release cut" is answered by the repository, not by what the step
       # before printed: is there a vX.Y.Z tag of this commit's line on the
-      # commit we checked out? That holds for both triggers, it is empty when
-      # nothing was released (a commit nobody asked to release), and it is
-      # still true on a re-run after a release whose image tagging failed. See
+      # commit we checked out? It is empty when nothing was released, and it
+      # is still true on a re-run after a release whose image tagging failed. See
       # scripts/release/released-version.mjs.
       #
       # Not asked in a dry run. A dry run for a commit that is already
