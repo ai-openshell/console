@@ -12,7 +12,22 @@ A release `vX.Y.Z` is three things, all made by `publish.yml`:
 | Container image tags `X.Y.Z` and `X.Y` | `ghcr.io/ai-openshell/console` | retagging the image CI already built |
 | Helm chart `openshell-dashboard`, version `X.Y.Z` | `oci://ghcr.io/ai-openshell/console/helm-chart` | packaging the chart at the released commit |
 
-The chart's registry path follows the repository's name (`publish.yml` pushes to `oci://ghcr.io/<owner>/<repository>/helm-chart`), so a package created under a new name starts out private: make it public in the organization's package settings before announcing the release. Releases up to `0.1.2` are at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart`, the path before the repository moved to `ai-openshell/console`; nothing is published there any more. The image moved the same way: releases up to `0.1.3` are at `quay.io/gkrumbach07/openshell-dashboard`, and CI pushes every newer image to `ghcr.io/ai-openshell/console` with the workflow's own token, so no registry secret is needed. That package also starts out private.
+The chart's registry path follows the repository's name (`publish.yml` pushes to `oci://ghcr.io/<owner>/<repository>/helm-chart`), so a package created under a new name starts out private: make it public in the organization's package settings before announcing the release. Releases up to `0.1.2` are at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart`, the path before the repository moved to `ai-openshell/console`; nothing is published there any more. The image moved the same way: releases up to `0.1.3` are at `quay.io/gkrumbach07/openshell-dashboard`, and CI pushes every newer image to `ghcr.io/ai-openshell/console`. That package also starts out private.
+
+## Who can write the packages
+
+The workflow's own token cannot write any package: no job asks for `packages: write`. Two environments, kept by the organization's infra team, each hold a token named `GHCR_TOKEN` that can write to one thing:
+
+| Environment | Who may use it | Its token writes to | Used by |
+|---|---|---|---|
+| `release` | `main` and `release/**` only | `ghcr.io/ai-openshell/console` and its Helm chart | `ci.yml` on a push (`build`, `push-manifest`, `promote-latest`, `publish-dev-chart`) and `publish.yml` (`tag-image`, `publish-chart`) |
+| `pr-images` | a run a maintainer approved | `ghcr.io/ai-openshell/console-dev` only | `ci.yml`'s `pr-image` job |
+
+A pull request never publishes to `console`, even one that edits a workflow: it runs with no environment. It does not write the build cache that `main`'s build, and so a release, reads.
+
+**An image of a pull request.** The `pr-image` job waits on every pull request from a branch of this repository. When a maintainer approves it (*Review deployments* on the pull request's checks), it builds `ghcr.io/ai-openshell/console-dev:pr-<n>` and `:sha-<7>` for linux/amd64. Each new push waits for approval again. A fork's pull request gets no image. The job runs on `pull_request`, never `pull_request_target`, so it cannot share `main`'s cache.
+
+Every action in `ci.yml`, `publish.yml` and `follow-upstream.yml` is pinned by commit SHA, because those jobs hold these tokens.
 
 The BFF and the UI ship together and share the version.
 
@@ -112,7 +127,7 @@ publish.yml   started by a person, on main or release/X.Y
 ```
 
 - **The image is built once.** `scripts/retag-image.sh` adds `latest`, `X.Y.Z` and `X.Y` later, by pointing the tag at the digest of `sha-<7>`, so a released image is byte for byte the one CI built for the commit that passed.
-- **`latest` waits for everything.** `sha-<7>` and `pr-<n>` are pushed when the build finishes. `latest` moves after every job in `ci.yml` has passed on `main`.
+- **`latest` waits for everything.** `sha-<7>` is pushed when the build of a push finishes. `latest` moves after every job in `ci.yml` has passed on `main`.
 - **`latest` only moves forward, and no release moves it.** A run can be re-run for thirty days and keeps its commit, so `promote-latest` first checks that the commit is still the tip of `main` (`scripts/branch-tip.sh`), and otherwise succeeds without touching the registry.
 - **A version is written once.** `retag-image.sh` refuses to point an existing `X.Y.Z` at another digest, and `publish-chart` leaves an existing chart version untouched. `X.Y`, `latest` and the development chart `0.0.0-dev` are meant to move.
 
