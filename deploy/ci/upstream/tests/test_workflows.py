@@ -639,14 +639,11 @@ class CiTestsThePinnedGateway(unittest.TestCase):
         for job in ("stable-release", "compat", "release-tooling", "check-backend"):
             self.assertIn("        %s," % job, needs)
 
-    def test_a_pull_request_from_this_repository_gets_its_images(self):
-        # The build and its manifest are not limited by base branch; only by
-        # the head being in this repository, which is what has the registry login.
-        for name in ("build", "push-manifest"):
-            text = "\n".join(CI_ALL_JOBS[name])
-            self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", text)
-            self.assertNotIn("base_ref", text)
-        self.assertIn("type=ref,event=pr,prefix=pr-", "\n".join(CI_ALL_JOBS["push-manifest"]))
+    def test_nothing_publishes_from_a_pull_request_but_the_pr_image_job(self):
+        self.assertIn("      PUBLISH_IMAGE: ${{ github.event_name == 'push' }}", CI_ALL_JOBS["build"])
+        for name in ("push-manifest", "image-range"):
+            self.assertIn("    if: github.event_name == 'push'", CI_ALL_JOBS[name], name)
+        self.assertNotIn("event=pr", "\n".join(CI_ALL_JOBS["push-manifest"]))
 
 
 class TheSweepIsRetired(unittest.TestCase):
@@ -702,6 +699,69 @@ class StackScript(unittest.TestCase):
         # A version asked for by name wins over the pins.
         asked = STACK.index('if [ -n "${OPENSHELL_VERSION:-}" ]; then')
         self.assertLess(asked, STACK.index('default_gateway="$(pinned gateway_image)"'))
+
+
+
+def job_environment(lines):
+    for line in lines:
+        m = re.match(r"^    environment:\s*(.+)$", line)
+        if m:
+            return m.group(1).strip()
+    return None
+
+
+class Publishing(unittest.TestCase):
+    """Packages are written only with an environment's token, never with the workflow's own."""
+
+    ALL = [("ci.yml", name, lines) for name, lines in CI_ALL_JOBS.items()] + [
+        ("publish.yml", name, lines) for name, lines in jobs(PUBLISH).items()
+    ]
+
+    def test_no_job_lets_the_workflow_token_write_packages(self):
+        for workflow, name, lines in self.ALL:
+            self.assertNotEqual((permissions(lines) or {}).get("packages"), "write", "%s %s" % (workflow, name))
+
+    def test_every_job_that_holds_the_registry_token_is_in_an_environment(self):
+        holders = {}
+        for workflow, name, lines in self.ALL:
+            if "secrets.GHCR_TOKEN" in "\n".join(lines):
+                holders["%s %s" % (workflow, name)] = job_environment(lines)
+        self.assertEqual(
+            holders,
+            {
+                "ci.yml build": "${{ github.event_name == 'push' && 'release' || '' }}",
+                "ci.yml push-manifest": "release",
+                "ci.yml promote-latest": "release",
+                "ci.yml publish-dev-chart": "release",
+                "ci.yml pr-image": "pr-images",
+                "publish.yml tag-image": "release",
+                "publish.yml publish-chart": "release",
+            },
+        )
+
+    def test_a_pull_request_writes_no_cache_a_release_reads(self):
+        build = "\n".join(CI_ALL_JOBS["build"])
+        self.assertIn("cache-to: ${{ github.event_name == 'push' && format(", build)
+        self.assertNotIn("cache-to", "\n".join(CI_ALL_JOBS["pr-image"]))
+
+    def test_pr_images_go_to_console_dev_after_approval_and_never_from_a_fork(self):
+        job = CI_ALL_JOBS["pr-image"]
+        text = "\n".join(job)
+        self.assertIn(
+            "    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository",
+            job,
+        )
+        self.assertIn("    environment: pr-images", job)
+        self.assertIn("images: ghcr.io/ai-openshell/console-dev", text)
+        self.assertNotIn("ghcr.io/ai-openshell/console\n", text + "\n")
+        code = "\n".join(line for line in CI.splitlines() if not line.lstrip().startswith("#"))
+        self.assertNotIn("pull_request_target", code)
+
+    def test_every_action_in_ci_and_publish_is_pinned_by_sha(self):
+        for workflow, name, lines in self.ALL:
+            for step in steps(lines):
+                if step["uses"]:
+                    self.assertRegex(step["uses"], PINNED, "%s %s" % (workflow, name))
 
 
 if __name__ == "__main__":
