@@ -26,7 +26,7 @@ Then follow [Run it locally](docs/development.md#run-it-locally): `make setup`, 
 
 **`main`, by default.** `main` is built on one released OpenShell gateway, and CI tests every pull request against it.
 
-**`next`, only if it cannot build or pass on `main`.** `next` is `main` moved to upstream's newest pre-release: its gateway in CI, and its Go SDK. Work that needs something only that release has (a new SDK method, an RPC the released gateway does not serve) branches from `next` and targets it, and reaches `main` when `next` merges on the day upstream releases. A workflow rebases `next` onto `main` and force-pushes it, so rebase your branch afterwards (`git fetch origin && git rebase --fork-point origin/next`). If there is no `next`, upstream has nothing ahead of `main`.
+**A bump branch, only if it cannot build or pass on `main`.** `bump/openshell-X.Y.Z` is `main` moved to an upstream release: its gateway in CI, and its Go SDK. The Follow upstream workflow creates one for each new stable release and never touches it again, so fixes the move needs are pushed to it directly. Work that needs something only an upcoming release has (a new SDK method, an RPC the released gateway does not serve) goes on that release's bump branch. Before upstream ships it, ask a maintainer to start a prep branch for the pre-release ([`deploy/ci/upstream/README.md`](deploy/ci/upstream/README.md#working-on-a-bump)); its pull request cannot merge until the stable release is out.
 
 **`release/X.Y`**, for a critical or security fix to the release line before `main`'s. Nothing else is backported ([ADR 0005](docs/adrs/0005-gateway-compatibility-and-releases.md), decision 5).
 
@@ -38,7 +38,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/), such as `fix: 
 
 #### Merging does not release; the title is the release note
 
-Merging a pull request releases nothing. A person starts a release with the `Release` workflow ([docs/releasing.md](docs/releasing.md)); the one exception is the pull request from `next`, which is released once it is merged. Nobody chooses the version, and no title changes it ([ADR 0005](docs/adrs/0005-gateway-compatibility-and-releases.md), decision 11): a `feat:` does not make a minor, and a `!` does not make a major.
+Merging a pull request releases nothing. A person starts a release with the `Release` workflow ([docs/releasing.md](docs/releasing.md)), the move to a new OpenShell release included. Nobody chooses the version, and no title changes it ([ADR 0005](docs/adrs/0005-gateway-compatibility-and-releases.md), decision 11): a `feat:` does not make a minor, and a `!` does not make a major.
 
 The title still matters: it is the release note. With a squash merge the pull request **title** is the commit message, and a release's notes list the title of every commit since the release before, as written. Only a commit whose type or scope is `ci` (`ci: …`, `fix(ci): …`) is left out; `isCiCommit` in [`scripts/release/release-notes.mjs`](scripts/release/release-notes.mjs) decides.
 
@@ -50,7 +50,7 @@ The title still matters: it is the release note. With a squash merge the pull re
 
 `deploy/ci/gateway-pins.json` names the one OpenShell release a branch is built on: the gateway and supervisor images CI runs, and the Go SDK in `backend/go.mod`. The three come from one upstream release tag and move together, in one commit ([ADR 0005](docs/adrs/0005-gateway-compatibility-and-releases.md), decision 7).
 
-You do not move it. The [Follow upstream](.github/workflows/follow-upstream.yml) workflow finds new releases from upstream's tags and makes the move on `next`; merging `next` is how `main` gets it. A pull request into `main` or `release/**` that pins a pre-release fails the `pins a stable release` check. [`deploy/ci/upstream/README.md`](deploy/ci/upstream/README.md#a-pin-move) lists every file a pin move changes.
+You do not move it. The [Follow upstream](.github/workflows/follow-upstream.yml) workflow finds new releases from upstream's tags and makes the move on a bump branch, `bump/openshell-X.Y.Z`, with a pull request into `main`; merging it is how `main` gets it. A pull request that pins a pre-release fails the `pins a stable release` check. [`deploy/ci/upstream/README.md`](deploy/ci/upstream/README.md#a-pin-move) lists every file a pin move changes.
 
 ### Developer Certificate of Origin (DCO)
 

@@ -38,8 +38,9 @@ function tempDir(t) {
  * of a scratch copy.
  *
  * Everything is worked out from whatever release is committed, never from a
- * release written here: on `next` the committed release is a pre-release, and
- * these tests run there too.
+ * release written here: on a bump branch prepared ahead of an upstream
+ * release the committed release is a pre-release, and these tests run there
+ * too.
  */
 function movedPins(t) {
   const dir = tempDir(t);
@@ -60,7 +61,7 @@ function movedPins(t) {
     nextSdk,
     // A newer patch release of the same line.
     patch: write('patch.json', { ...pins, release: nextPatch }),
-    // A pre-release of it, which is what `next` pins.
+    // A pre-release of it, which is what a prep bump branch pins.
     preRelease: write('pre-release.json', { ...pins, release: `${nextPatch}-pre.2` }),
     // The first release of the next minor line.
     nextLine: write('next-line.json', { ...pins, release: nextMinor }),

@@ -1,22 +1,19 @@
 name: CI
 
 # Every change is tested against the gateway pinned by the branch it merges
-# into (ADR 0005, decision 6), so this runs for all three kinds of branch:
+# into (ADR 0005, decision 6):
 #
 #   main          one stable upstream release
 #   release/X.Y   the line before it, for critical and security fixes
-#   next          the upcoming release, usually a pre-release. A pull request
-#                 into `next` is work that needs it; the pull request from
-#                 `next` into main is the move itself, and this workflow
-#                 running there is "check B" (follow-upstream.yml).
 #
-# Nothing runs on a push to `next`: it is rebased and force-pushed, and its
-# pull request into main already tests every commit that lands on it.
+# A bump (follow-upstream.yml) is a pull request into main from the branch
+# bump/openshell-<version>, opened by the bump-bot App, and this workflow
+# running on it tests the move.
 on:
   push:
     branches: [main, "release/**"]
   pull_request:
-    branches: [main, next, "release/**"]
+    branches: [main, "release/**"]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -189,19 +186,15 @@ jobs:
   # NOT a compatibility result. It answers one question: does this branch pin
   # a stable upstream release?
   #
-  # `main` and `release/**` pin stable releases only. `next` pins the upcoming
-  # release, which is a pre-release until upstream cuts the stable one, so the
-  # pull request from `next` into main fails HERE, by name, for as long as that
-  # lasts. That is what keeps it from merging, and it is kept apart from
-  # `compat` on purpose: a red `compat` means the dashboard does not work with
+  # `main` and `release/**` pin stable releases only. A bump to a pre-release
+  # is a prep branch, and its pull request into main fails HERE, by name, until
+  # upstream cuts the stable release. That is what keeps it from merging, and
+  # it is kept apart from `compat` on purpose: a red `compat` means the dashboard does not work with
   # the gateway, and a red check here only means "not released upstream yet".
-  # The Follow upstream workflow re-pins `next` when the stable release is out.
-  #
-  # A pull request INTO `next` is work that needs the pre-release, so the job
-  # does not run there.
+  # The Follow upstream workflow opens a bump to the stable release when it is
+  # out.
   stable-release:
     name: pins a stable release
-    if: github.event_name == 'push' || github.base_ref != 'next'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -212,8 +205,8 @@ jobs:
 
   # The compatibility suite against the one gateway this branch pins.
   #
-  # The gateway is a RELEASE pinned by digest: a stable release, or on `next` a
-  # pre-release. Never a `dev` build. A dev gateway resolves a moving
+  # The gateway is a RELEASE pinned by digest: a stable release, or on a prep
+  # branch a pre-release. Never a `dev` build. A dev gateway resolves a moving
   # ghcr.io/nvidia/openshell/sandbox:dev image at runtime, so even pinned by
   # digest it drifts with upstream HEAD, which is what turned this job red on
   # main on 2026-10-02 with no change on our side.
@@ -402,9 +395,7 @@ jobs:
   # the commit (and the PR number, on a pull request). It needs only `build`,
   # deliberately: these tags say "this is what that commit built", which is true
   # whether or not the commit is any good, and they are how a pull request gets
-  # an image to try before its checks finish. That includes a pull request into
-  # `next` and the pull request from `next` into main: both get `pr-<n>` and
-  # `sha-<7>`, built on the pre-release's SDK.
+  # an image to try before its checks finish.
   #
   # It does NOT tag `latest`. That tag is a recommendation. Moved here, on
   # every push to main with only `build` to wait for, it could point at a

@@ -1,20 +1,12 @@
 """Everything the workflow writes for a person to read.
 
-The pin commit's message, the `next` pull request, the comment left when
-`next` cannot be rebased, the issue check A keeps, and the run summaries.
-
-Two rules about what the text may claim:
-
-  * it says only what this run did or observed. A pull request body is
-    written before the push, so it describes the branch, not the run;
-  * the pull request body is the same on every run that finds nothing new.
-    It carries no run link and no timestamp, so an hourly run that changes
-    nothing rewrites nothing.
+The bump commit's message, the bump pull request, the issue check A keeps, and
+the run summaries. Each says only what this run did or observed.
 """
 
 import textwrap
 
-import nextbranch
+import bump
 import versions
 from upstream import UPSTREAM_URL
 
@@ -22,19 +14,15 @@ ADR_PATH = "docs/adrs/0005-gateway-compatibility-and-releases.md"
 WORKFLOW_PATH = ".github/workflows/follow-upstream.yml"
 PINS_PATH = "deploy/ci/gateway-pins.json"
 
-NEXT = "next"
 BASE = "main"
 
-# The pull request title is the pin commit's title, and the notes of the
-# release that follows the merge list it as written. The title is not what
-# releases it, and not what numbers it: publish.yml releases a merged pull
-# request whose head was `next` in this repository
-# (scripts/release/next-merge.mjs), at the version worked out from the pin
+# The bump commit's title, and its pull request's. The release that follows
+# the merge lists it as written. Nothing reads it: a release is cut by hand
+# (publish.yml), at the version worked out from the pin
 # (scripts/release/next-version.mjs).
 PR_TITLE = "fix: move to OpenShell %s"
 
-PR_MARKER = "<!-- follow-upstream:next -->"
-CONFLICT_MARKER = "<!-- follow-upstream:conflict %s -->"
+PR_MARKER = "<!-- follow-upstream:bump -->"
 ISSUE_MARKER = "<!-- follow-upstream:check-a -->"
 # The label of the one issue check A keeps.
 ISSUE_LABEL = "compat-migrate"
@@ -99,187 +87,70 @@ def commit_message(target, pinned):
         )
     if not target["stable"]:
         paragraphs.append(
-            "A pre-release, so this is on next and cannot merge. The commit is rewritten in place "
-            "when upstream tags another pre-release or releases %s." % target["base"]
+            "A pre-release, so this is a prep branch and cannot merge: its `pins a stable release` "
+            "check fails until upstream releases %s. Fixes the move needs go on this branch." % target["base"]
         )
     body = "\n\n".join(
         textwrap.fill(paragraph, 72, break_long_words=False, break_on_hyphens=False) for paragraph in paragraphs
     )
-    return "%s\n\n%s\n\n%s: %s\n" % (pr_title(version), body, nextbranch.TRAILER, version)
+    return "%s\n\n%s\n\n%s: %s\n" % (pr_title(version), body, bump.TRAILER, version)
 
 
-# --- the next pull request -------------------------------------------------
+# --- the bump pull request -----------------------------------------------
 
 
-def _ci_note(has_bot_token):
-    if has_bot_token:
-        return (
-            "**CI** runs on every push to `next`. Its `compat` job is the compatibility suite "
-            "against the release pinned here, on the SDK pinned here."
-        )
-    return (
-        "**CI does not start by itself on this pull request.** `next` is pushed with the "
-        "workflow's default token, and GitHub starts no workflow for what that token pushes. "
-        "To run CI on the commit that is here now, close this pull request and reopen it. With "
-        "the repository secret `UPSTREAM_BOT_TOKEN` set, it starts by itself."
-    )
-
-
-def pr_body(plan, outcome, has_bot_token=False, automerge=False, repo_url="", release_branch=None):
-    """The description of the `next` pull request, from what is on the branch."""
-    doc = outcome["pins"]
-    release = doc["release"]
-    stable = versions.is_stable(release)
-    pinned = plan["pinned"]
-    target = plan.get("target") or {}
-    people = outcome.get("people") or []
-    new_line = versions.line(release) != pinned["line"]
-
+def pr_body(plan, repo_url=""):
+    """The description of a bump pull request. Written once, when it is opened."""
+    target, pinned = plan["target"], plan["pinned"]
+    version = target["version"]
+    new_line = not target["same_line"]
     lines = [
         PR_MARKER,
-        "This is `next`: the move to the upcoming OpenShell release, opened early (%s, decisions 7 "
-        "and 8). The %s workflow keeps the branch and rewrites this description, so an edit made "
-        "here by hand is lost."
-        % (_link("ADR 0005", repo_url, ADR_PATH), _link("Follow upstream", repo_url, WORKFLOW_PATH)),
+        "Opened by the %s workflow (%s). The bot made this branch and will not touch it again: push "
+        "whatever the move needs to it, like any branch."
+        % (_link("Follow upstream", repo_url, WORKFLOW_PATH), _link("ADR 0005", repo_url, ADR_PATH)),
         "",
-    ]
-    if stable:
-        lines += [
-            "**Where it is.** `next` pins OpenShell %s, a stable release. `main` pins %s. This is "
-            "ready to merge once its checks pass." % (_code(release), _code(pinned["release"])),
-        ]
-    else:
-        lines += [
-            "**Where it is.** `next` pins OpenShell %s, a pre-release. `main` pins %s. Until "
-            "upstream releases %s this stays a draft and its `pins a stable release` check fails, "
-            "which is what keeps it from merging; that check says nothing about compatibility. When "
-            "the release is out, the workflow moves the pin to it and marks this ready for review."
-            % (_code(release), _code(pinned["release"]), _code(versions.base(release))),
-        ]
-    if target.get("skipped") and release == target.get("version"):
-        lines += [
-            "",
-            "Upstream also released %s since %s. The branch goes straight to the newest release; "
-            "the ones in between are not walked through."
-            % (", ".join(_code(version) for version in target["skipped"]), _code(pinned["release"])),
-        ]
-
-    lines += [
-        "",
-        "**What moved.** One commit, always the first after `main`. It changes %s, `backend/go.mod` "
-        "and `backend/go.sum`, %sand the generated block of `README.md`."
+        "**What moved.** One commit: %s, `backend/go.mod` and `backend/go.sum`, %sand the generated "
+        "block of `README.md`, from OpenShell %s to %s (%s)."
         % (
             _code(PINS_PATH),
             "the gateway release line compiled into the BFF, " if new_line else "",
+            _code(pinned["release"]),
+            _code(version),
+            _tag_link(target["tag"]),
         ),
         "",
-        "| | Pinned on `next` |",
+        "| | Pinned here |",
         "|---|---|",
-        "| release | %s |" % _code(release),
-        "| gateway | %s |" % _code(doc["gateway_image"]),
-        "| supervisor | %s |" % _code(doc["supervisor_image"]),
-        "| Go SDK | %s |" % _code(doc["sdk"]),
+        "| release | %s |" % _code(version),
+        "| gateway | %s |" % _code(target["gateway_image"]),
+        "| supervisor | %s |" % _code(target["supervisor_image"]),
+        "| Go SDK | at %s |" % _code(target["commit"][:12]),
     ]
-
+    if target.get("skipped"):
+        lines += [
+            "",
+            "Upstream also released %s since %s. This goes straight to the newest."
+            % (", ".join(_code(skipped) for skipped in target["skipped"]), _code(pinned["release"])),
+        ]
+    if not target["stable"]:
+        lines += [
+            "",
+            "**A pre-release: this is a prep branch.** Its `pins a stable release` check fails until "
+            "upstream releases %s, which is what keeps it from merging. When the release is out, the "
+            "workflow opens a bump to it; move the fixes from here onto that branch and close this one."
+            % _code(target["base"]),
+        ]
     if new_line:
         lines += [
             "",
-            "**This starts gateway release line %s.** `main` is on %s, and the line compiled into "
-            "the BFF moves with the pin."
-            % (_code(versions.line(release) + ".x"), _code(pinned["line"] + ".x")),
-        ]
-        if release_branch:
-            name, sha, created = release_branch
-            lines += [
-                "%s %s from `main` at %s, so the %s line can still get critical and security fixes "
-                "after this merges. A commit that reaches `main` after that and before this merges "
-                "is not on it; cherry-pick it there if the old line needs it."
-                % (
-                    _code(name),
-                    "was created by the run that wrote this," if created else "exists; it was created",
-                    _code(sha[:12]),
-                    _code(pinned["line"] + ".x"),
-                ),
-            ]
-
-    lines += [
-        "",
-        "**Work that needs the upcoming release goes here.** Open a pull request into `next` only "
-        "for a change that cannot build or pass on `main`; everything else goes to `main`. When "
-        "`main` moves, the workflow rebases `next` onto it and force-pushes, so rebase a branch "
-        "cut from `next` after that. Commits on `next` besides the pin move: %d." % len(people),
-        "",
-        _ci_note(has_bot_token),
-        "",
-    ]
-    if automerge:
-        lines += [
-            "**Merging.** `UPSTREAM_AUTOMERGE` is on: once this is ready for review, the workflow asks "
-            "GitHub to merge it by rebase when the checks `main` requires have passed. If `main` "
-            "requires none, GitHub refuses that, and this is merged by hand with *Rebase and merge*.",
-        ]
-    else:
-        lines += [
-            "**Merging.** Nothing merges this automatically. Use *Rebase and merge*, so the pin move "
-            "and each commit on `next` land on `main` as they are.",
+            "**This starts gateway release line %s.** If the %s line still needs patch releases, make "
+            "its branch from `main` before this merges: `git push origin origin/main:refs/heads/release/%s`."
+            % (_code(target["line"] + ".x"), _code(pinned["line"] + ".x"), pinned["line"]),
         ]
     lines += [
-        "After the merge, a release is cut by itself once CI has passed on `main`. Nobody chooses its "
-        "version: it is the console's next patch on the gateway release line `main` then pins.",
-    ]
-    if new_line:
-        lines += [
-            "",
-            "**That release starts the console's %s line.** A line that has no release yet starts "
-            "at `.0`, so this one is the console's minor release for the new gateway release line "
-            "(ADR 0005, decision 2). It is cut without anyone being asked."
-            % _code(versions.line(release) + ".x"),
-        ]
-    return "\n".join(lines) + "\n"
-
-
-def conflict_key(outcome):
-    """What makes two conflicts the same one, so the comment is left once.
-
-    The commit `next` is on and the files in conflict. `main` moving again
-    while both stay the same is the same conflict, and says nothing new.
-    """
-    conflict = outcome["conflict"]
-    return "%s %s %s" % (outcome["next"], conflict["stage"], ",".join(sorted(conflict["files"])))
-
-
-def conflict_comment(plan, outcome):
-    conflict = outcome["conflict"]
-    target = plan.get("target") or {}
-    commit = conflict.get("commit")
-    if conflict["stage"] == "rebase":
-        headline = "**`next` could not be rebased onto `main`.**"
-        doing = "Replaying"
-        remedy = "rebase `next` onto `main` by hand, resolve the conflict and force-push"
-    else:
-        headline = "**The pin on `next` could not be moved to OpenShell %s.**" % _code(target.get("version", "?"))
-        doing = "Folding the move into the pin commit and replaying"
-        remedy = (
-            "take the change to these files out of that commit, or drop the commit, and force-push: "
-            "the pin move writes them, and a commit on top that edits the same lines cannot follow it"
-        )
-    lines = [
-        CONFLICT_MARKER % conflict_key(outcome),
-        "%s %s %s conflicts in:"
-        % (
-            headline,
-            doing,
-            "%s (%s)" % (_code(commit["sha"][:12]), commit["subject"]) if commit else "the commits on it",
-        ),
         "",
-    ]
-    lines += ["- %s" % _code(path) for path in sorted(conflict["files"])]
-    lines += [
-        "",
-        "`next` was left exactly as it was. The workflow regenerates `backend/go.sum` and "
-        "`frontend/package-lock.json` by itself and stops for anything else. To carry on, %s; the "
-        "next run takes it from there. This comment is not repeated while `next` and the files in "
-        "conflict stay the same." % remedy,
+        "**After it merges,** cut a release by hand: Actions > Publish > Run workflow on `main`.",
     ]
     return "\n".join(lines) + "\n"
 
@@ -380,8 +251,8 @@ def issue_text(plan, run_url="", repo_url=""):
             "",
             "1. **Report it upstream**, at %s/issues, with the failing test and the request it sends. "
             "The remedy belongs there: a fix in the next patch release." % UPSTREAM_URL,
-            "2. Until then the console stays on %s, the last release that passed. Check B, CI on the "
-            "`next` pull request, shows whether the console built on the new SDK passes."
+            "2. Until then the console stays on %s, the last release that passed. CI on the bump "
+            "pull request shows whether the console built on the new SDK passes."
             % _code(pinned["release"]),
         ]
     elif target["same_line"]:
@@ -399,8 +270,10 @@ def issue_text(plan, run_url="", repo_url=""):
             "1. Read the failing tests. If a Stable interface changed (proto, SDK, CLI, config, "
             "policy), **report it upstream now**, at %s/issues, before %s is released."
             % (UPSTREAM_URL, _code(target["base"])),
-            "2. If the change is one the console has to follow, make it on `next`, where check B (CI "
-            "on the `next` pull request) runs the suite on the pre-release's SDK.",
+            "2. If the change is one the console has to follow, start a prep branch: run the Follow "
+            "upstream workflow by hand with `version` %s and the dry-run box cleared. It opens "
+            "`%s`, where CI runs the suite on the pre-release's SDK. Or wait for the stable release, "
+            "which the workflow bumps to by itself." % (_code(version), target["branch"]),
         ]
     else:
         lines += [
@@ -414,9 +287,10 @@ def issue_text(plan, run_url="", repo_url=""):
             "",
             "### What to do",
             "",
-            "Do the work on `next`. Check B, CI on the `next` pull request, runs the suite with the "
-            "console built on the new line's SDK, and the console's minor release is held until it "
-            "passes (ADR 0005, decision 2).",
+            "Wait for the stable release, which the workflow bumps to by itself, or start now: run the "
+            "Follow upstream workflow by hand with `version` %s and the dry-run box cleared. It opens "
+            "`%s`, where CI runs the suite with the console built on the new line's SDK. The console's "
+            "minor release waits until that passes (ADR 0005, decision 2)." % (_code(version), target["branch"]),
         ]
     return title, "\n".join(lines) + "\n"
 
@@ -449,8 +323,17 @@ def plan_summary(plan, dry_run=False):
             ", which starts release line %s" % _code(target["line"] + ".x") if not target["same_line"] else "",
         )
     )
+    if plan.get("requested"):
+        lines.append("- Asked for by hand.")
     if target["skipped"]:
         lines.append("- Skipped on the way: %s." % ", ".join(_code(version) for version in target["skipped"]))
+    if target["bump"]:
+        lines.append("- Bump branch: %s." % _code(target["branch"]))
+    else:
+        lines.append(
+            "- No bump: a scheduled run bumps only to a stable release. Check A still tests it. To make a "
+            "prep branch, run this workflow by hand with `version` %s." % _code(target["version"])
+        )
     if not target["ready"]:
         lines.append("- **Not yet:** %s. The next run looks again." % target["waiting_for"])
     else:
@@ -459,59 +342,17 @@ def plan_summary(plan, dry_run=False):
     return "\n".join(lines) + "\n"
 
 
-def next_summary(outcome, publish, dry_run=False):
-    """What the `next` job did, or in a dry run would do."""
+def bump_summary(outcome, publish, dry_run=False):
+    """What the `bump` job did, or in a dry run would do."""
     would = "would be " if dry_run else ""
-    action = outcome["action"]
-    lines = ["### `next`", ""]
-    if action == "create":
-        lines.append("- `next` %screated from `main` at %s." % (would, _code(outcome["main"][:12])))
-    elif action == "update":
-        lines.append("- `next` %sforce-pushed (with lease): %s." % (would, outcome["reason"]))
-    elif action == "none":
-        lines.append("- `next` is left as it is: %s." % outcome["reason"])
-    elif action == "conflict":
-        conflict = outcome["conflict"]
-        lines.append(
-            "- **%s.** In conflict: %s. `next` is left exactly as it was."
-            % (outcome["reason"].capitalize(), ", ".join(_code(path) for path in sorted(conflict["files"])))
-        )
-    elif action == "delete":
-        lines.append("- `next` %sdeleted: %s." % (would, outcome["reason"]))
-    elif action == "leave":
-        lines.append("- `next` is left as it is: %s." % outcome["reason"])
-    if outcome.get("sha"):
-        lines.append("- Commit: %s." % _code(outcome["sha"]))
-    if outcome.get("regenerated"):
-        lines.append(
-            "- Regenerated after a conflict: %s." % ", ".join(_code(path) for path in sorted(set(outcome["regenerated"])))
-        )
-    if publish.get("release_branch"):
-        lines.append(
-            "- %s %screated from `main` at %s."
-            % (_code(publish["release_branch"]["name"]), would, _code(publish["release_branch"]["sha"][:12]))
-        )
-    pull = publish.get("pr")
-    if pull:
-        if pull["number"] is None:
-            lines.append(
-                "- A %spull request `next` -> `main` %sopened: %s."
-                % ("draft " if pull["draft"] else "", would, _code(pull["title"]))
-            )
-        else:
-            changes = [name for name in ("title", "body") if pull.get("set_" + name)]
-            if pull.get("set_draft"):
-                changes.append("marked %s" % ("a draft" if pull["set_draft"] == "draft" else "ready for review"))
-            if changes:
-                lines.append("- Pull request #%d %supdated: %s." % (pull["number"], would, ", ".join(changes)))
-            else:
-                lines.append("- Pull request #%d is already right; nothing to change." % pull["number"])
-    if publish.get("comment"):
-        lines.append("- A comment naming the files in conflict %sleft on the pull request." % would)
-    elif action == "conflict":
-        lines.append("- The pull request already carries a comment about this conflict; it is not repeated.")
-    if publish.get("automerge"):
-        lines.append("- Auto-merge (rebase) %sturned on for the pull request." % would)
+    lines = ["### Bump", ""]
+    if publish.get("skip"):
+        lines.append("- Nothing %sdone: %s." % (would, publish["skip"]))
+        return "\n".join(lines) + "\n"
+    lines.append("- %s %spushed: main at %s plus one commit, %s." % (
+        _code(publish["branch"]), would, _code(outcome["main"][:12]), _code(outcome["sha"][:12])))
+    if publish.get("pr"):
+        lines.append("- A pull request into `main` %sopened: %s." % (would, _code(publish["pr"]["title"])))
     return "\n".join(lines) + "\n"
 
 

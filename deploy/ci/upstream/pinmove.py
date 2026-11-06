@@ -13,11 +13,12 @@ The SDK has no tags of its own: it is a directory of the upstream repository.
 So it is pinned to the commit the release tag points at, with `go get
 <module>@<commit>` and `go mod tidy`. Never `@latest`.
 
-What runs here is `go get`, `go mod tidy` and this repository's own README
-script. None of them builds or executes anything from upstream, which is why
+What runs here is `go get`, `go mod tidy`, `go list -m` and this
+repository's own README script. None of them builds or executes anything from upstream, which is why
 the job that holds a write token is allowed to call this.
 """
 
+import json
 import os
 import re
 import subprocess
@@ -80,6 +81,32 @@ def sdk_commands(commit):
     return [["go", "get", "%s@%s" % (SDK_MODULE, commit)], ["go", "mod", "tidy"]]
 
 
+def _tagged_commit(run, backend, version, echo):
+    """The commit a tagged SDK version was cut from, or None.
+
+    From OpenShell 0.1.7 upstream tags the SDK module itself (sdk/go/vX.Y.Z),
+    so `go get <module>@<commit>` resolves to that tag rather than to a
+    pseudo-version, and the version no longer names the commit. `go list -m
+    -json` reads the module's metadata, which records the commit the tag
+    points at; it builds and runs nothing.
+    """
+    if pins.sdk_commit(version) or not version:
+        return None
+    command = ["go", "list", "-m", "-json", "%s@%s" % (SDK_MODULE, version)]
+    if echo:
+        echo("$ " + " ".join(command))
+    code, output = run(command, backend)
+    if code != 0:
+        raise PinMoveError("`%s` failed in %s:\n%s" % (" ".join(command), backend, output.rstrip()))
+    try:
+        found = json.loads(output[output.index("{") :])
+    except ValueError:
+        raise PinMoveError("`%s` printed no module metadata:\n%s" % (" ".join(command), output.rstrip()))
+    origin = found.get("Origin") or {}
+    commit = origin.get("Hash")
+    return commit[:12] if isinstance(commit, str) and len(commit) >= 12 else None
+
+
 def at_target(doc, tree, target):
     """Is this tree already on the target: its release, its images and its SDK commit?
 
@@ -128,7 +155,7 @@ def apply(tree, target, tools, run=None, echo=None):
     sdk = pins.go_mod_sdk(_read(os.path.join(tree, GO_MOD)))
     if sdk is None:
         raise PinMoveError("%s no longer requires %s after the move" % (GO_MOD, SDK_MODULE))
-    commit = pins.sdk_commit(sdk)
+    commit = pins.sdk_commit(sdk) or _tagged_commit(run, backend, sdk, echo)
     if not commit or not target["commit"].startswith(commit):
         raise PinMoveError(
             "%s requires SDK %s after `go get`, which is not commit %s of %s. Nothing is pinned "

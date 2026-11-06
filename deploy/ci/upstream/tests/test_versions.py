@@ -150,7 +150,7 @@ class SelectTarget(unittest.TestCase):
         self.assertIsNone(target("0.1.3", "v0.1.3"))
 
     def test_a_branch_on_a_pre_release_follows_the_same_rules(self):
-        # `next` is not what the target is chosen for, but the rule holds there.
+        # A prep branch is not what the target is chosen for, but the rule holds there.
         self.assertEqual(target("0.1.4-pre.2", "v0.1.4-pre.2", "v0.1.4-pre.3"), "0.1.4-pre.3")
         self.assertEqual(target("0.1.4-pre.2", "v0.1.4-pre.3", "v0.1.4"), "0.1.4")
         self.assertIsNone(target("0.1.4-pre.2", "v0.1.4-pre.1", "v0.1.4-pre.2"))

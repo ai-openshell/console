@@ -17,22 +17,25 @@ to the commit of an upstream release tag, and a workflow makes that move
 (ADR 0005, decision 7; hard facts 17 and 20 in
 `.claude/rules/openshell-api.md`):
 
-- `.github/workflows/follow-upstream.yml` reads upstream's tags every hour. It
-  keeps the `next` branch one commit ahead of `main`: the pins file, `go.mod`,
-  `go.sum`, the built-in release line when the minor changes, and the README's
-  generated block, all moved to the upcoming release. `next` pins the newest
-  pre-release until upstream cuts the stable release, then that.
-- Never `go get ...@latest` or a branch. Never move the pins in a pull request
-  of your own, never push to `next`, and never open its pull request.
-- If no `next` exists, upstream has nothing ahead of `main`
+- `.github/workflows/follow-upstream.yml` reads upstream's tags once a day.
+  For a new stable release it creates `bump/openshell-X.Y.Z`: `main` plus one
+  commit that moves the pins file, `go.mod`, `go.sum`, the built-in release
+  line when the minor changes, and the README's generated block. It opens a
+  pull request into `main`. A person can also run it with a `version`, a
+  pre-release included, to get a prep branch before upstream ships.
+- The bot creates a bump branch once and never touches it again: it is an
+  ordinary branch after that.
+- Never `go get ...@latest` or a branch. Never move the pins in a commit of
+  your own, and never start the workflow yourself.
+- If no bump branch exists, either upstream has nothing ahead of `main`
   (`python3 deploy/ci/upstream/follow.py plan --out /tmp/plan.json` says what
-  it sees). If one should exist and does not, stop and say so.
+  it sees) or nobody has asked for a prep branch. If one should exist and does
+  not, stop and say so.
 
 What this skill is for is the work a move leaves: the BFF does not build
-against the new SDK, the compat suite fails on `next`, or a new capability is
-worth exposing. All of it is done **on `next`**: branch from it, and open the
-pull request into it. It cannot land on `main`, where the SDK is still the old
-one.
+against the new SDK, the compat suite fails on the bump pull request, or a new
+capability is worth exposing. All of it is done **on the bump branch**. It
+cannot land on `main`, where the SDK is still the old one.
 
 ## Steps
 
@@ -40,8 +43,9 @@ one.
 
 ```bash
 git fetch origin
-git log --oneline --reverse origin/main..origin/next   # the first line is the pin move
-git diff origin/main origin/next -- deploy/ci/gateway-pins.json backend/go.mod
+git branch -r --list 'origin/bump/openshell-*'
+git log --oneline --reverse origin/main..origin/bump/openshell-<release>   # the first line is the pin move
+git diff origin/main origin/bump/openshell-<release> -- deploy/ci/gateway-pins.json backend/go.mod
 ```
 
 Then compare the two SDK versions:
@@ -49,11 +53,14 @@ Then compare the two SDK versions:
 - `sdk/go/openshell/v1/types/` for request/response field details
 - `sdk/go/proto/sandboxv1/` only when the frontend policy protojson contract is involved
 
-### 2. Branch from `next`
+### 2. Check out the bump branch
 
 ```bash
-git checkout -b fix/sdk-<release> origin/next
+git switch bump/openshell-<release>
 ```
+
+If it has fallen behind `main` or conflicts with it, rebase it onto
+`origin/main` first; the bot will not.
 
 ### 3. Update call sites if the SDK shape changed
 
@@ -87,19 +94,21 @@ Docker and `jq`), with nothing set it runs that same gateway, by digest:
 make compat
 ```
 
-### 6. Commit and open the pull request into `next`
+### 6. Commit and push to the bump branch
 
 ```bash
 git commit -s -m "fix(bff): follow the OpenShell <release> SDK"
-gh pr create --base next
+git push
 ```
 
-Do not touch `deploy/ci/gateway-pins.json`, the SDK line of `backend/go.mod`
-or the README's generated block: the pin move owns them, and a commit on top
-that edits the same lines stops the workflow from moving the pin again. The
-workflow rebases `next` when `main` moves and force-pushes it, so rebase your
-branch afterwards (`git fetch origin && git rebase --fork-point origin/next`).
+Push only when asked to; otherwise leave the commit and say what it does. Do
+not touch `deploy/ci/gateway-pins.json`, the SDK line of `backend/go.mod` or
+the README's generated block: the pin move owns them.
+
+Work done on a prep branch (a pre-release) does not merge from there. When the
+stable release ships, the daily run opens its own bump branch; cherry-pick the
+fixes onto it and close the prep pull request.
 
 Use `fix:` for what a user would notice breaking, `feat:` for a new
-capability. The commits reach `main` as they are when `next` merges, on the
-day upstream releases, and the release notes are written from their titles.
+capability. Merging the bump pull request releases nothing; a person cuts the
+release ([docs/releasing.md](../../../docs/releasing.md)).
