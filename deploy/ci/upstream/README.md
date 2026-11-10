@@ -62,13 +62,22 @@ It runs once a day, and when a person starts it.
    - Otherwise, take `main` and add one commit, the pin move: titled
      `fix: move to OpenShell X.Y.Z`, with the trailer
      `OpenShell-Release: X.Y.Z`, signed off, by `github-actions[bot]`.
+   This job holds no write token and needs no environment, so a dry run from
+   any branch previews the bump in full. The commit is handed on as a git
+   bundle.
+3. **`publish-bump`.** Only on `main`, and never in a dry run:
+   - Check `main` out as it is now and refuse the bump unless its target is
+     still ahead of what `main` pins (`follow.py check-forward`). The commit
+     was made from `main` as the run found it, and a bump that `main` has
+     caught up with would move it back.
+   - Take the commit from the bundle, then get a token for the bump-bot App.
    - Push the new branch. The push is refused if the branch appeared in the
      meantime.
-   - Open the pull request into `main`. It is opened with the bump-bot App's
-     token, so CI runs on it like on anyone's pull request.
-3. **`check-a`.** Build the BFF from `main` as it is, start the target's
+   - Open the pull request into `main`. The App opens it, so CI runs on it
+     like on anyone's pull request.
+4. **`check-a`.** Build the BFF from `main` as it is, start the target's
    gateway by digest, run the compatibility suite.
-4. **`report`.** A check A failure goes to one issue, labelled
+5. **`report`.** A check A failure goes to one issue, labelled
    `compat-migrate`, rewritten in place and closed when it passes. The issue
    says what to do: wait for upstream, or start a prep branch.
 
@@ -155,14 +164,15 @@ the template.
 | Job | Permissions | Runs |
 |---|---|---|
 | `plan` | `contents: read` | this directory's code, `git ls-remote`, registry lookups |
-| `bump` | `contents: read`, plus the bump-bot App's token (contents and pull requests write) | git, `go get`, `go mod tidy`, `go list -m`, the README script. No build, no test, no container |
+| `bump` | `contents: read`, `pull-requests: read`; no secret, no environment | git, `go get`, `go mod tidy`, `go list -m`, the README script. No build, no test, no container |
+| `publish-bump` | `contents: read`, plus the bump-bot App's token (contents and pull requests write), in the `bump-bot` environment | git, and `git push` and `gh` through `follow.py publish`. No toolchain, no module download |
 | `check-a` | `contents: read` | upstream's gateway image, the BFF, the compat suite |
 | `report` | `contents: read`, `issues: write` | this directory's code and `gh issue` |
 
-In the `bump` job the App's token is handed only to the steps that look up pull
-requests from the branch and to `follow.py publish`, which runs `git push`
-and `gh` with the arguments the tokenless step before it chose and refuses
-anything else. The scripts it runs come from the commit the workflow runs at,
+The App's token exists only in `publish-bump`, made after the forward check
+and after the commit is taken from the bundle, and is handed only to
+`follow.py publish`, which runs `git push` and `gh` with the arguments the
+`bump` job chose and refuses anything else. The scripts it runs come from the commit the workflow runs at,
 never from the tree it is changing. `tests/test_workflows.py` and
 `tests/test_publish.py` enforce this.
 
@@ -170,7 +180,7 @@ never from the tree it is changing. `tests/test_workflows.py` and
 
 | | Without it |
 |---|---|
-| The `bump-bot` environment, limited to `main`, with the secrets `BUMP_BOT_CLIENT_ID` and `BUMP_BOT_PRIVATE_KEY` | The `bump` job cannot get a token and fails. Plan, check A and the report still run |
+| The `bump-bot` environment, limited to `main`, with the secrets `BUMP_BOT_CLIENT_ID` and `BUMP_BOT_PRIVATE_KEY` | `publish-bump` cannot get a token and fails. Plan, check A and the report still run |
 | The bump-bot App installed on this repository with Contents and Pull requests read/write | The token cannot push or open the pull request, and the run fails |
 
 *Allow GitHub Actions to create and approve pull requests* is not needed and stays off.

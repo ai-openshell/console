@@ -41,18 +41,18 @@
 #   4. No ${{ }} inside a run: script; values         tests/test_workflows.py
 #      reach scripts through env:.
 #   5. Least-privilege permissions per job.           tests/test_workflows.py
-#   6. The job that can write (bump) builds and       tests/test_workflows.py
-#      tests nothing and starts no container. It
-#      runs git, `go get`, `go mod tidy` and this
-#      repository's own scripts. Only its `gh` and
-#      `git push` steps see a token, and those run
-#      nothing else.
+#   6. The job that can write (publish-bump) builds,   tests/test_workflows.py
+#      tests and fetches nothing. The job that makes
+#      the commit (bump) holds no write token and no
+#      environment, so a dry run previews it from any
+#      ref. Only the publish step sees the App token.
 #   7. The job that runs upstream's gateway image     tests/test_workflows.py
 #      (check-a) can read the repository and
 #      nothing more.
-#   8. A bump branch is created, never moved.         publish.py
+#   8. A bump branch is created, never moved, and     publish.py, follow.py
+#      never moves main's pin backward.
 #
-# TOKENS. The bump job pushes and opens the pull request with a token of the
+# TOKENS. The publish-bump job pushes and opens the pull request with a token of the
 # organization's bump-bot GitHub App, made at the start of the job from the
 # App's client ID and private key. Those secrets live in the `bump-bot`
 # environment, which only `main` can deploy to, so a run from any other ref
@@ -146,50 +146,33 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # The only job that can write to the repository, so it is the one that must
-  # not run anything from upstream. It builds nothing, tests nothing and
-  # starts no container. What it runs: git; `go get` and `go mod tidy`, which
-  # download modules and execute none of them; and this repository's own
-  # scripts, from the commit the workflow runs at.
-  #
-  # The token is not in the job's environment and is not left in the checkout
-  # (persist-credentials: false). Two steps are handed it: the one that lists
-  # the pull requests from the bump branch, and the one that publishes.
-  # Everything that reaches the network for modules runs between them,
-  # without it.
+  # Makes the bump commit. It holds no write token and needs no environment,
+  # so it runs from any ref: a dry run anywhere previews the bump in full. It
+  # runs git; `go get`, `go mod tidy` and `go list -m`, which download modules
+  # and execute none of them; and this repository's own scripts. The commit is
+  # handed to publish-bump as a git bundle.
   bump:
-    name: Open a bump to OpenShell ${{ needs.plan.outputs.target }}
+    name: Make the bump to OpenShell ${{ needs.plan.outputs.target }}
     needs: plan
     if: needs.plan.outputs.bump == 'true'
     runs-on: ubuntu-latest
-    # The App's secrets are in this environment, and only main may use it.
-    environment: bump-bot
     permissions:
-      contents: read         # the checkout; pushing is done with the App's token
+      contents: read
+      pull-requests: read   # which pull requests have come from the bump branch
     env:
       GH_REPO: ${{ github.repository }}
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}
       BRANCH: ${{ needs.plan.outputs.branch }}
+    outputs:
+      made: ${{ steps.bump.outputs.made }}
     steps:
-      # A token of the bump-bot App, limited to this repository and to what
-      # the job does with it. It is handed only to the two steps that list
-      # and publish.
-      - name: Get a token for the bump-bot App
-        id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ secrets.BUMP_BOT_CLIENT_ID }}
-          private-key: ${{ secrets.BUMP_BOT_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
       # Every branch: whether the bump branch exists is read from what was
       # fetched.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           persist-credentials: false
-      # For `go get` and `go mod tidy` only. No cache is restored into a job
-      # that can write.
+      # No cache is restored into a job whose result is published.
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: backend/go.mod
@@ -208,17 +191,15 @@ jobs:
       # is ours is decided by publish.py from isCrossRepository.
       - name: List the pull requests from the bump branch
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           gh pr list --head "$BRANCH" --state all --limit 100 \
             --json number,headRefName,isCrossRepository,state,url \
             > /tmp/upstream/pulls.json
 
-      # No token here. Decides everything and pushes nothing: it leaves the
-      # bump commit under a local ref, and the steps to take on GitHub in
-      # publish.json.
       - name: Make the bump commit
+        id: bump
         env:
           # setup-go pins the toolchain to the one it installed. A release
           # whose SDK needs a newer Go has to be able to say so in go.mod, or
@@ -231,8 +212,69 @@ jobs:
             --repo-url "$REPO_URL" --dry-run "$DRY_RUN" --out /tmp/upstream/bump
           cat /tmp/upstream/bump/summary.md >> "$GITHUB_STEP_SUMMARY"
 
-      # `publish` runs `git push` and `gh` with the arguments the step above
-      # chose, and nothing else. In a dry run it prints them.
+      - name: Bundle the bump commit for publish-bump
+        if: steps.bump.outputs.made == 'true'
+        run: git bundle create /tmp/upstream/bump/bump.bundle refs/upstream/bump
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: upstream-bump
+          path: /tmp/upstream/bump
+          if-no-files-found: error
+          retention-days: 7
+
+  # Pushes the bump and opens its pull request, with a token of the bump-bot
+  # App. Its secrets are in the `bump-bot` environment, which only main can
+  # use, so this job runs only for a run on main that is not a dry run. It
+  # builds nothing and fetches no module: it checks main out as it is NOW,
+  # refuses a bump main has caught up with, takes the commit from the bundle,
+  # and only then asks for the token, which only the publishing step is handed.
+  publish-bump:
+    name: Open the bump to OpenShell ${{ needs.plan.outputs.target }}
+    needs: [plan, bump]
+    # The same test as DRY_RUN above, which a job-level `if` cannot read.
+    if: needs.bump.outputs.made == 'true' && github.ref == 'refs/heads/main' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+    runs-on: ubuntu-latest
+    environment: bump-bot
+    permissions:
+      contents: read
+    steps:
+      # main as it is now, not as the plan found it.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: upstream-plan
+          path: /tmp/upstream
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: upstream-bump
+          path: /tmp/upstream/bump
+
+      # The bump commit was made from main as it was when the run started. If
+      # main's pin has reached or passed the target since, publishing would
+      # move main back, and the bot never refreshes a bump branch.
+      - name: Refuse a bump main has caught up with
+        run: $FOLLOW check-forward --plan /tmp/upstream/plan.json --pins deploy/ci/gateway-pins.json
+
+      - name: Take the bump commit from the bundle
+        run: git fetch -q /tmp/upstream/bump/bump.bundle refs/upstream/bump:refs/upstream/bump
+
+      # A token of the bump-bot App, limited to this repository and to what
+      # the step after it does with it.
+      - name: Get a token for the bump-bot App
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.BUMP_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.BUMP_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # `publish` runs `git push` and `gh` with the arguments the bump job
+      # chose, and nothing else.
       - name: Push the branch and open the pull request
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}

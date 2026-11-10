@@ -11,7 +11,8 @@ made here, where it can be unit-tested:
     require-stable   fail when the pins name a pre-release (main, release/**)
     plan             which upstream release is ahead of this branch, if any
     bump             make main plus the pin move, and decide what to publish
-    publish          push the bump branch, start CI, open its pull request
+    check-forward    refuse a bump that main has caught up with since the plan
+    publish          push the bump branch and open its pull request
     record-check     turn check A's step outcomes into a result
     check-report     what check A's result means; render its issue
 
@@ -202,6 +203,34 @@ def cmd_bump(args, run=None):
     summary = report.bump_summary(outcome, decided, dry_run=dry_run)
     _write(os.path.join(args.out, "summary.md"), summary)
     print(summary)
+    # Whether there is a commit for the publish job to push. It is handed
+    # over as a git bundle of LOCAL_REF.
+    _set_outputs({"made": "true" if decided.get("push") else "false", "sha": (decided.get("push") or {}).get("sha", "")})
+    return 0
+
+
+def cmd_check_forward(args):
+    """Fail unless the plan's target is still ahead of what main pins now.
+
+    The bump commit was made from main as the run found it. Before it is
+    published, main is read again: if its pin has reached or passed the
+    target in the meantime, the bump would move main back, and the bot
+    never refreshes a bump branch, so it is refused here.
+    """
+    made = _json(args.plan) or {}
+    target = made.get("target") or {}
+    doc = _load_valid_pins(args.pins)
+    now = doc["release"]
+    if not target.get("version"):
+        return _fail(["the plan has no target, so there is nothing to publish"])
+    if versions.order(target["version"]) <= versions.order(now):
+        return _fail(
+            [
+                "main now pins OpenShell %s, which is not below the bump's target %s. main moved while "
+                "this run worked; nothing is published, and the next run plans again." % (now, target["version"])
+            ]
+        )
+    print("main pins OpenShell %s; the bump to %s still moves it forward" % (now, target["version"]))
     return 0
 
 
@@ -292,7 +321,11 @@ def build_parser():
     p.add_argument("--dry-run", default="false", choices=flag)
     p.add_argument("--out", required=True)
 
-    p = add("publish", cmd_publish, "push the bump branch, start CI on it and open its pull request")
+    p = add("check-forward", cmd_check_forward, "refuse a bump main has caught up with")
+    p.add_argument("--plan", required=True)
+    p.add_argument("--pins", default=DEFAULT_PINS, help="the pins of main as it is now")
+
+    p = add("publish", cmd_publish, "push the bump branch and open its pull request")
     p.add_argument("--plan", required=True, help="the publish.json that `bump` wrote")
     p.add_argument("--dry-run", default="false", choices=flag)
     p.add_argument("--summary", default="", help="write notes for the run summary here")

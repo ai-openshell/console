@@ -259,6 +259,20 @@ class Bump(Cli):
         self.assertIn("would be pushed", out)
         self.assertIsNone(self.repo.origin_branch(self.BRANCH), "preparing pushes nothing")
 
+    def test_it_says_whether_there_is_a_commit_to_publish(self):
+        plan_path = self.plan_file(support.target("0.1.4"))
+        with mock.patch.object(follow.pinmove, "run_command", self.tools):
+            _, _, _, outputs = self.run_cli(
+                "bump", "--plan", plan_path, "--repo", self.repo.path, "--main-ref", "refs/remotes/origin/main", "--out", self.path("bump")
+            )
+        self.assertEqual(outputs["made"], "true")
+        self.assertEqual(len(outputs["sha"]), 40)
+        self.repo.push_branch(self.repo.rev("origin/main"), self.BRANCH)
+        _, _, _, outputs = self.run_cli(
+            "bump", "--plan", plan_path, "--repo", self.repo.path, "--main-ref", "refs/remotes/origin/main", "--out", self.path("bump2")
+        )
+        self.assertEqual((outputs["made"], outputs["sha"]), ("false", ""))
+
     def test_publish_in_a_dry_run_prints_the_commands_and_runs_none(self):
         self.bump(support.target("0.1.4"), "--dry-run", "true")
         with mock.patch.object(follow.publish_module, "run_command", side_effect=AssertionError("ran something")):
@@ -316,6 +330,29 @@ class Bump(Cli):
         self.assertEqual(code, 1)
         self.assertIn("go get", err)
         self.assertFalse(os.path.exists(self.path("bump", "publish.json")))
+
+
+class CheckForward(Cli):
+    def check(self, pinned_now, target="0.1.4"):
+        plan_path = self.write("plan.json", {"target": dict(support.target(target))})
+        return self.run_cli("check-forward", "--plan", plan_path, "--pins", self.pins_file(support.pins_doc(pinned_now)))
+
+    def test_a_target_still_ahead_of_main_passes(self):
+        code, out, _, _ = self.check("0.1.3")
+        self.assertEqual(code, 0)
+        self.assertIn("still moves it forward", out)
+
+    def test_main_reaching_or_passing_the_target_is_refused(self):
+        for now in ("0.1.4", "0.1.5"):
+            code, _, err, _ = self.check(now)
+            self.assertEqual(code, 1, now)
+            self.assertIn("not below the bump's target 0.1.4", err)
+
+    def test_a_plan_without_a_target_is_refused(self):
+        plan_path = self.write("plan.json", {"target": None})
+        code, _, err, _ = self.run_cli("check-forward", "--plan", plan_path, "--pins", self.pins_file(support.pins_doc("0.1.3")))
+        self.assertEqual(code, 1)
+        self.assertIn("no target", err)
 
 
 class PublishFailure(Cli):

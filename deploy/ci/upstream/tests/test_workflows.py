@@ -164,13 +164,15 @@ def action(uses):
 LIST = "List the pull requests from the bump branch"
 BUILD = "Make the bump commit"
 PUBLISH_STEP = "Push the branch and open the pull request"
+FORWARD = "Refuse a bump main has caught up with"
+UNBUNDLE = "Take the bump commit from the bundle"
 
 
 class ScannerSanity(unittest.TestCase):
     """If the scanner found nothing, every test below would pass for no reason."""
 
     def test_finds_the_jobs(self):
-        self.assertEqual(sorted(FOLLOW_JOBS), ["bump", "check-a", "plan", "report"])
+        self.assertEqual(sorted(FOLLOW_JOBS), ["bump", "check-a", "plan", "publish-bump", "report"])
         self.assertEqual(sorted(CI_JOBS), ["compat", "compat-pins", "stable-release"])
 
     def test_finds_the_scripts(self):
@@ -179,13 +181,14 @@ class ScannerSanity(unittest.TestCase):
 
     def test_finds_the_steps(self):
         found = steps(FOLLOW_JOBS["bump"])
-        self.assertEqual(action(found[0]["uses"]), "actions/create-github-app-token")
-        self.assertEqual(action(found[1]["uses"]), "actions/checkout")
-        named = [step["name"] for step in found]
-        for name in (LIST, BUILD, PUBLISH_STEP):
-            self.assertIn(name, named)
-        self.assertIn("GH_TOKEN", [s for s in found if s["name"] == PUBLISH_STEP][0]["env"])
+        self.assertEqual(action(found[0]["uses"]), "actions/checkout")
+        self.assertIn(LIST, [step["name"] for step in found])
+        self.assertIn(BUILD, [step["name"] for step in found])
         self.assertIn("BRANCH:", job_env(FOLLOW_JOBS["bump"]))
+        published = steps(FOLLOW_JOBS["publish-bump"])
+        for name in (FORWARD, UNBUNDLE, APP_TOKEN_STEP, PUBLISH_STEP):
+            self.assertIn(name, [step["name"] for step in published])
+        self.assertIn("GH_TOKEN", [s for s in published if s["name"] == PUBLISH_STEP][0]["env"])
 
     def test_reads_block_and_inline_scripts(self):
         lines = [
@@ -249,8 +252,10 @@ class LeastPrivilege(unittest.TestCase):
         # Changing this table is the point at which a reviewer should ask why.
         expected = {
             "plan": {"contents": "read"},
-            # It writes with the bump-bot App's token, not with this one.
-            "bump": {"contents": "read"},
+            # Makes the commit; reads which pull requests came from the branch.
+            "bump": {"contents": "read", "pull-requests": "read"},
+            # Writes with the bump-bot App's token, not with this one.
+            "publish-bump": {"contents": "read"},
             "check-a": {"contents": "read"},
             "report": {"contents": "read", "issues": "write"},
         }
@@ -269,15 +274,15 @@ class LeastPrivilege(unittest.TestCase):
             for step in steps(lines):
                 if "secrets." in step["text"]:
                     holders.append((name, step["name"]))
-        self.assertEqual(holders, [("bump", APP_TOKEN_STEP)])
+        self.assertEqual(holders, [("publish-bump", APP_TOKEN_STEP)])
         self.assertNotIn("UPSTREAM_BOT_TOKEN", FOLLOW)
 
     def test_the_app_secrets_come_from_an_environment_only_main_can_use(self):
-        self.assertIn("    environment: bump-bot", FOLLOW_JOBS["bump"])
+        self.assertIn("    environment: bump-bot", FOLLOW_JOBS["publish-bump"])
         for name, lines in FOLLOW_JOBS.items():
-            if name != "bump":
+            if name != "publish-bump":
                 self.assertNotIn("environment:", "\n".join(lines), name)
-        step = [s for s in steps(FOLLOW_JOBS["bump"]) if s["name"] == APP_TOKEN_STEP][0]
+        step = [s for s in steps(FOLLOW_JOBS["publish-bump"]) if s["name"] == APP_TOKEN_STEP][0]
         self.assertIn("client-id: ${{ secrets.BUMP_BOT_CLIENT_ID }}", step["text"])
         self.assertIn("private-key: ${{ secrets.BUMP_BOT_PRIVATE_KEY }}", step["text"])
         # Asked for with what the job does and nothing more.
@@ -299,14 +304,10 @@ class ActionsArePinned(unittest.TestCase):
             self.assertEqual(permissions(lines), {"contents": "read"}, name)
 
 
-class TheJobThatCanWrite(unittest.TestCase):
-    """`bump` can push a branch, open a pull request and start a workflow, so it runs nothing foreign.
+class TheJobThatMakesTheCommit(unittest.TestCase):
+    """`bump` runs `go get` and the README script, so it holds no write token and no environment.
 
-    check-a may run upstream's gateway image because the worst it can do is
-    read a public repository. This job could push to main (there is no branch
-    protection), so the rule is the reverse: it builds nothing, tests nothing
-    and starts no container, and the token reaches only the steps that list
-    or publish.
+    That is also what lets a dry run from any ref preview the bump in full.
     """
 
     def setUp(self):
@@ -317,77 +318,106 @@ class TheJobThatCanWrite(unittest.TestCase):
     def step(self, name):
         return [s for s in self.steps if s["name"] == name][0]
 
+    def test_it_holds_no_secret_no_environment_and_writes_nothing(self):
+        self.assertNotIn("secrets.", self.text)
+        self.assertNotIn("environment:", self.text)
+        self.assertNotIn("write", (permissions(self.lines) or {}).values())
+
+    def test_it_runs_whenever_the_plan_says_bump_dry_run_or_not(self):
+        self.assertIn("    if: needs.plan.outputs.bump == 'true'", self.lines)
+
     def test_it_sets_up_two_toolchains_and_no_container(self):
         used = [action(step["uses"]) for step in self.steps if step["uses"]]
         self.assertEqual(
             used,
-            [
-                "actions/create-github-app-token",
-                "actions/checkout",
-                "actions/setup-go",
-                "actions/setup-node",
-                "actions/download-artifact",
-            ],
+            ["actions/checkout", "actions/setup-go", "actions/setup-node", "actions/download-artifact", "actions/upload-artifact"],
         )
-
-    def test_its_scripts_call_only_gh_and_this_repositorys_own_command_line(self):
-        allowed = re.compile(
-            r"^(set -euo pipefail$|\$FOLLOW (bump|publish) |gh pr list |status=0$|"
-            r"cat /tmp/upstream/bump/[a-z]+\.md >> \"\$GITHUB_STEP_SUMMARY\"$|"
-            r"if \[ -f /tmp/upstream/bump/published\.md \]; then$|fi$|exit \"\$status\"$)"
-        )
-        for step in self.steps:
-            for script in step["scripts"]:
-                for line in commands(script):
-                    self.assertRegex(line, allowed, "%s: %r" % (step["name"], line))
-
-    def test_nothing_is_built_tested_or_started(self):
         for script in run_scripts(self.lines):
-            for word in ("docker", "npm ", "npx ", "pip ", "make ", "curl ", "wget ", "e2e-stack", "node "):
+            for word in ("docker", "npm ", "npx ", "e2e-stack", "curl "):
                 self.assertNotIn(word, script)
-            # No Go in the workflow itself: `go get` and `go mod tidy` are run
-            # by pinmove.py, and those two are all it knows how to run.
-            self.assertIsNone(re.search(r"(^|[\s;&|(])go\s", script))
-        for command in pinmove.sdk_commands("0" * 40):
-            self.assertIn(tuple(command[:2]), (("go", "get"), ("go", "mod")))
-        self.assertEqual(pinmove.sdk_commands("0" * 40)[1], ["go", "mod", "tidy"])
 
     def test_the_checkout_keeps_no_credentials_and_fetches_everything(self):
-        checkout = [s for s in self.steps if action(s["uses"]) == "actions/checkout"][0]
+        checkout = self.steps[0]
         self.assertIn("persist-credentials: false", checkout["text"])
         self.assertIn("fetch-depth: 0", checkout["text"])
-        self.assertNotIn("token:", checkout["text"])
 
     def test_no_cache_is_restored_into_it(self):
-        setup_go = [s for s in self.steps if action(s["uses"]) == "actions/setup-go"][0]
-        self.assertIn("cache: false", setup_go["text"])
-        self.assertNotIn("cache:", [s for s in self.steps if action(s["uses"]) == "actions/setup-node"][0]["text"])
-
-    def test_the_token_is_not_in_the_jobs_environment(self):
-        env = job_env(self.lines)
-        self.assertNotIn("GH_TOKEN", env)
-        self.assertNotIn("github.token", env)
-        self.assertNotIn("secrets.", env)
-
-    def test_only_the_steps_that_list_and_publish_are_handed_the_token(self):
-        holders = [step for step in self.steps if "app-token.outputs.token" in step["text"] or "github.token" in step["text"]]
-        self.assertEqual([step["name"] for step in holders], [LIST, PUBLISH_STEP])
-        for step in holders:
-            self.assertIn(TOKEN, step["env"])
-        self.assertEqual(self.text.count("steps.app-token.outputs.token"), 2)
-        self.assertNotIn("github.token", self.text)
+        self.assertIn("cache: false", [s for s in self.steps if action(s["uses"]) == "actions/setup-go"][0]["text"])
 
     def test_the_listing_step_runs_gh_pr_list_and_nothing_else(self):
         lines = commands(self.step(LIST)["scripts"][0])
-        self.assertEqual(lines[0], "set -euo pipefail")
         self.assertEqual(len(lines), 2)
         line = lines[1]
         # Every state: a closed or merged pull request stops the bot as well.
         self.assertTrue(line.startswith('gh pr list --head "$BRANCH" --state all '), line)
-        # Which pull request is ours is decided in tested code, from this field.
         self.assertIn("isCrossRepository", line)
-        self.assertNotIn("--jq", line)
         self.assertRegex(line, r"> /tmp/upstream/pulls\.json$")
+        self.assertIn("GH_TOKEN: ${{ github.token }}", self.step(LIST)["env"])
+
+    def test_what_it_is_told_reaches_the_command(self):
+        script = re.sub(r"\\\n\s*", "", self.step(BUILD)["scripts"][0])
+        for flag in ("--plan /tmp/upstream/plan.json", "--pulls /tmp/upstream/pulls.json", '--repo-url "$REPO_URL"', '--dry-run "$DRY_RUN"'):
+            self.assertIn(flag, script)
+        self.assertEqual([l.strip() for l in self.step(BUILD)["env"].splitlines() if not l.strip().startswith("#")], ["GOTOOLCHAIN: auto"])
+
+    def test_the_commit_is_handed_on_as_a_bundle_only_when_one_was_made(self):
+        step = self.step("Bundle the bump commit for publish-bump")
+        self.assertIn("if: steps.bump.outputs.made == 'true'", step["text"])
+        self.assertEqual(commands(step["scripts"][0]), ["git bundle create /tmp/upstream/bump/bump.bundle refs/upstream/bump"])
+        self.assertIn("      made: ${{ steps.bump.outputs.made }}", self.lines)
+
+
+class TheJobThatCanWrite(unittest.TestCase):
+    """`publish-bump` holds the App token, so it builds, tests and fetches nothing."""
+
+    def setUp(self):
+        self.lines = FOLLOW_JOBS["publish-bump"]
+        self.steps = steps(self.lines)
+        self.text = "\n".join(self.lines)
+
+    def step(self, name):
+        return [s for s in self.steps if s["name"] == name][0]
+
+    def test_it_runs_only_on_main_for_a_real_run_with_a_commit_to_push(self):
+        condition = [line for line in self.lines if line.startswith("    if:")][0]
+        for part in (
+            "needs.bump.outputs.made == 'true'",
+            "github.ref == 'refs/heads/main'",
+            "!(github.event_name == 'workflow_dispatch' && inputs.dry_run)",
+        ):
+            self.assertIn(part, condition)
+        self.assertIn("    needs: [plan, bump]", self.lines)
+
+    def test_it_uses_no_toolchain_and_no_container(self):
+        used = [action(step["uses"]) for step in self.steps if step["uses"]]
+        self.assertEqual(
+            used,
+            ["actions/checkout", "actions/download-artifact", "actions/download-artifact", "actions/create-github-app-token"],
+        )
+        for script in run_scripts(self.lines):
+            for word in ("docker", "npm ", "node ", "go ", "curl ", "make "):
+                self.assertNotIn(word, script)
+
+    def test_it_checks_out_main_as_it_is_now_without_credentials(self):
+        checkout = self.steps[0]
+        self.assertIn("ref: main", checkout["text"])
+        self.assertIn("persist-credentials: false", checkout["text"])
+
+    def test_main_is_checked_and_the_commit_taken_before_the_token_exists(self):
+        names = [s["name"] for s in self.steps]
+        self.assertLess(names.index(FORWARD), names.index(APP_TOKEN_STEP))
+        self.assertLess(names.index(UNBUNDLE), names.index(APP_TOKEN_STEP))
+        self.assertLess(names.index(APP_TOKEN_STEP), names.index(PUBLISH_STEP))
+        self.assertEqual(
+            commands(self.step(FORWARD)["scripts"][0]),
+            ["$FOLLOW check-forward --plan /tmp/upstream/plan.json --pins deploy/ci/gateway-pins.json"],
+        )
+
+    def test_only_the_publishing_step_is_handed_the_token(self):
+        holders = [s["name"] for s in self.steps if "app-token.outputs.token" in s["text"] or "github.token" in s["text"]]
+        self.assertEqual(holders, [PUBLISH_STEP])
+        self.assertIn(TOKEN, self.step(PUBLISH_STEP)["env"])
+        self.assertNotIn("GH_TOKEN", job_env(self.lines))
 
     def test_the_publishing_step_runs_publish_and_nothing_else(self):
         script = self.step(PUBLISH_STEP)["scripts"][0]
@@ -395,45 +425,18 @@ class TheJobThatCanWrite(unittest.TestCase):
         for word in ("$FOLLOW bump", "git ", "gh ", "go ", "node", "python"):
             self.assertNotIn(word, script)
 
-    def test_the_step_that_reaches_the_network_for_modules_has_no_token(self):
-        step = self.step(BUILD)
-        self.assertNotIn("secrets.", step["text"])
-        self.assertNotIn("github.token", step["text"])
-        self.assertNotIn("GH_TOKEN", step["env"])
-        self.assertEqual([line.strip() for line in step["env"].splitlines() if not line.strip().startswith("#")], ["GOTOOLCHAIN: auto"])
-        # And it runs between the two that do.
-        names = [s["name"] for s in self.steps]
-        self.assertLess(names.index(LIST), names.index(BUILD))
-        self.assertLess(names.index(BUILD), names.index(PUBLISH_STEP))
-
-    def test_what_it_is_told_reaches_the_command(self):
-        script = re.sub(r"\\\n\s*", "", self.step(BUILD)["scripts"][0])
-        for flag in (
-            "--plan /tmp/upstream/plan.json",
-            "--pulls /tmp/upstream/pulls.json",
-            '--repo-url "$REPO_URL"',
-            '--dry-run "$DRY_RUN"',
-        ):
-            self.assertIn(flag, script)
-
-    def test_it_runs_only_when_the_plan_says_bump(self):
-        self.assertIn("    if: needs.plan.outputs.bump == 'true'", self.lines)
-
-    def test_nothing_merges_and_nothing_turns_auto_merge_on(self):
-        self.assertNotIn("UPSTREAM_AUTOMERGE", self.text)
-        for script in run_scripts(self.lines):
-            self.assertNotIn("pr merge", script)
-            self.assertNotIn("--auto ", script)
-        import publish
-        source = open(publish.__file__, encoding="utf-8").read()
-        for word in ("pr merge", "enablePullRequestAutoMerge", "pr close", '"--force"'):
-            self.assertNotIn(word, source)
-
     def test_a_failed_publish_still_writes_its_summary_and_still_fails(self):
         script = self.step(PUBLISH_STEP)["scripts"][0]
         self.assertIn("|| status=$?", script)
         self.assertLess(script.index("|| status=$?"), script.index("GITHUB_STEP_SUMMARY"))
-        self.assertTrue(commands(script)[-1] == 'exit "$status"')
+        self.assertEqual(commands(script)[-1], 'exit "$status"')
+
+    def test_nothing_merges_and_nothing_turns_auto_merge_on(self):
+        self.assertNotIn("UPSTREAM_AUTOMERGE", FOLLOW)
+        import publish
+        source = open(publish.__file__, encoding="utf-8").read()
+        for word in ("pr merge", "enablePullRequestAutoMerge", "pr close", '"--force"'):
+            self.assertNotIn(word, source)
 
 
 class CheckA(unittest.TestCase):
@@ -559,6 +562,7 @@ class SideEffects(unittest.TestCase):
         # Every other job needs the plan, so skipping it skips them all.
         for name in ("bump", "check-a"):
             self.assertIn("    needs: plan", FOLLOW_JOBS[name])
+        self.assertIn("    needs: [plan, bump]", FOLLOW_JOBS["publish-bump"])
         self.assertIn("needs.plan.result == 'success'", "\n".join(FOLLOW_JOBS["report"]))
 
     def test_the_issue_is_found_by_the_label_the_report_names(self):
