@@ -166,6 +166,24 @@ class WhatStopsIt(PinMove):
             self.apply(support.target("0.1.4"), elsewhere)
         self.assertIn("Nothing is pinned to an SDK other than the one at the release tag", str(caught.exception))
 
+    def test_a_tagged_sdk_is_pinned_when_its_tag_is_the_release_commit(self):
+        # From OpenShell 0.1.7 upstream tags the SDK module, and `go get` of
+        # the release commit resolves to that tag.
+        to = support.target("0.1.4")
+        tools = support.FakeTools(tagged={to["commit"]: "v0.1.4"})
+        result = self.apply(to, tools)
+        self.assertEqual((result["moved"], result["sdk"]), (True, "v0.1.4"))
+        self.assertEqual(self.pins()["sdk"], "v0.1.4")
+        self.assertIn(["go", "list", "-m", "-json", "%s@v0.1.4" % pins.SDK_MODULE], tools.calls)
+
+    def test_a_tagged_sdk_whose_tag_is_another_commit_is_refused(self):
+        to = support.target("0.1.4")
+        tools = support.FakeTools(tagged={to["commit"]: "v0.1.4"})
+        tools.tag_commits["v0.1.4"] = "e" * 40
+        with self.assertRaises(pinmove.PinMoveError) as caught:
+            self.apply(to, tools)
+        self.assertIn("Nothing is pinned to an SDK other than the one at the release tag", str(caught.exception))
+
     def test_a_target_whose_image_is_of_another_release_is_refused(self):
         to = dict(support.target("0.1.4"), gateway_image=support.image("gateway", "0.1.3"))
         with self.assertRaises(pins.PinsError):

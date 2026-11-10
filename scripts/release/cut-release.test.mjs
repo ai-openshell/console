@@ -229,8 +229,8 @@ test('a tag that was not cut for the line raises the version to 0.1.4, and the r
   assert.doesNotMatch(stdout, /release line changed/);
 });
 
-// The merge of `next` is released with no dry run before it, and a release
-// cannot be renumbered afterwards.
+// A real run need not follow a dry run, and a release cannot be renumbered
+// afterwards.
 test('a real run does not publish a number that such a tag made too high', (t) => {
   const repo = withOldTags(t);
   repo.push('main', '--tags');
@@ -370,8 +370,8 @@ test('a pre-release pin never releases', (t) => {
   assert.deepEqual(repo.tags(), ['v0.1.0']);
 });
 
-// release/0.1 is created from main before `next` merges, so for a while both
-// are on the 0.1 line. A release from main in that window is not on the
+// release/0.1 is created from main before the move to 0.2 merges, so for a
+// while both are on the 0.1 line. A release from main in that window is not on the
 // release branch.
 test('a commit that does not contain the newest release of its line is refused', (t) => {
   const repo = repository(t);

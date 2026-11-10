@@ -1,93 +1,81 @@
-# Follow upstream OpenShell releases (ADR 0005, decisions 6, 7 and 8).
+# Follow upstream OpenShell releases (ADR 0005, decisions 6 to 8, as amended
+# on 2026-11-06).
 #
 # A branch of this repository is built on ONE upstream release, named by
 # deploy/ci/gateway-pins.json, and ci.yml tests every change against it. This
-# workflow is what moves that pin. Every hour it reads upstream's git tags and
+# workflow is what moves that pin. Once a day it reads upstream's git tags and
 # picks a target:
 #
 #   the newest stable release (vX.Y.Z) above the one main pins, if there is one;
 #   otherwise the newest pre-release (vX.Y.Z-pre.N) leading up to a release
 #   above it; otherwise nothing, and the run ends.
 #
-# With a target it does two things, and they answer different questions.
+# A person can also run it by hand with a `version`, and that is the target.
 #
-#   next       Keeps the `next` branch: main, then ONE commit that moves the
-#              pin (gateway and supervisor images, and the Go SDK at the tag's
-#              commit, together), then whatever people put on it. `next` is
-#              the bump pull request, opened early: a draft while the target is
-#              a pre-release, ready for review once upstream cuts the stable
-#              release. ci.yml running on that pull request is CHECK B, the
-#              dashboard built on the upcoming SDK against the upcoming gateway.
+# With a target it does two things.
+#
+#   bump       Opens a bump: the branch bump/openshell-<version>, which is main
+#              plus ONE commit that moves the pin (gateway and supervisor
+#              images, and the Go SDK at the tag's commit, together), and a
+#              pull request into main. A scheduled run bumps only to a stable
+#              release; a version asked for by hand is bumped to as it is, so
+#              a pre-release gets a prep branch. The bot makes a bump branch
+#              ONCE: when the branch exists, or any pull request has come from
+#              it, it does nothing. It never rebases, moves or force-pushes
+#              one; people push the fixes a move needs to it like any branch.
 #
 #   check A    Runs the compatibility suite with the BFF as main builds it
 #              today against the target's gateway. That is what a dashboard
 #              already installed will meet when the gateway is upgraded under
-#              it. A failure goes to one issue, rewritten in place and closed
-#              when it passes again.
+#              it, and the early warning for a pre-release. A failure goes to
+#              one issue, rewritten in place and closed when it passes again.
 #
-# Moving to a release is one change: the gateway images and the SDK move
-# together, in one commit.
+# Nothing here releases. A release is cut by hand (publish.yml).
 #
 # Invariants. Each is enforced in code, not only stated here:
 #   1. Only vX.Y.Z and vX.Y.Z-pre.N are followed.     versions.py
 #      dev / HEAD and @latest are never pinned.       pins.py, pinmove.py
 #   2. Images are pinned by digest, and check A       plan.py
-#      tests the digests `next` pins.
+#      tests the digests the bump pins.
 #   3. Every compat run uses -count=1.                tests/test_workflows.py
 #   4. No ${{ }} inside a run: script; values         tests/test_workflows.py
 #      reach scripts through env:.
 #   5. Least-privilege permissions per job.           tests/test_workflows.py
-#   6. The job that can write (next) builds and       tests/test_workflows.py
-#      tests nothing and starts no container. It
-#      runs git, `go get`, `go mod tidy`, a registry
-#      lookup and this repository's own scripts.
-#      Only its `gh` and `git push` steps see a
-#      token, and those run nothing else.
+#   6. The job that can write (publish-bump) builds,   tests/test_workflows.py
+#      tests and fetches nothing. The job that makes
+#      the commit (bump) holds no write token and no
+#      environment, so a dry run previews it from any
+#      ref. Only the publish step sees the App token.
 #   7. The job that runs upstream's gateway image     tests/test_workflows.py
 #      (check-a) can read the repository and
 #      nothing more.
-#   8. A conflict leaves `next` exactly as it was.    nextbranch.py
-#   9. Only a pull request whose head is `next` in    publish.py
-#      THIS repository is ever touched.
+#   8. A bump branch is created, never moved, and     publish.py, follow.py
+#      never moves main's pin backward.
 #
-# All decision logic lives in deploy/ci/upstream/ with unit tests. This file
-# only checks out, sets up toolchains and starts containers.
-#
-# TOKENS. The `next` job uses the secret UPSTREAM_BOT_TOKEN when it is set
-# and the workflow's default token otherwise.
-#   - With the default token, GitHub starts no workflow for what is pushed or
-#     opened, so CI does not run on the `next` pull request by itself (its
-#     description says what to press), and the repository setting "Allow
-#     GitHub Actions to create and approve pull requests" has to be on for the
-#     pull request to be opened at all. The default token may also never
-#     create or update a workflow file, so GitHub can refuse the push of a
-#     `next` that was rebased onto a main that changed one. That has not been
-#     seen here yet; the job says what to do if it happens.
-#   - UPSTREAM_BOT_TOKEN is a fine-grained or GitHub App token with Contents,
-#     Pull requests and Workflows read/write on this repository. With it, CI
-#     starts by itself.
-#
-# AUTO-MERGE is off unless the repository variable UPSTREAM_AUTOMERGE is
-# `true`. Then a `next` pull request that is ready and on a stable release is
-# set to merge by rebase once its required checks pass. The workflow only asks
-# GitHub to turn auto-merge on. It never merges a pull request itself, and
-# GitHub refuses the request while nothing is required of the pull request:
-# it needs "Allow auto-merge" and at least one required check on main.
-#
-# A red run means the workflow itself broke, could not publish, or could not
-# run check A. A finding never turns it red: a failing check A goes to the
-# issue, and a conflict on `next` to a comment on its pull request.
+# TOKENS. The publish-bump job pushes and opens the pull request with a token of the
+# organization's bump-bot GitHub App, made at the start of the job from the
+# App's client ID and private key. Those secrets live in the `bump-bot`
+# environment, which only `main` can deploy to, so a run from any other ref
+# cannot reach them. An App's pull request starts CI like a person's does;
+# one opened with the workflow's default token would start none, which is why
+# the default token is not used for it. The token is asked for with the two
+# permissions the job needs, contents and pull requests, and nothing else.
+# Every other job uses the default token, read only except the report's
+# issues: write.
+
 name: Follow upstream
 
 on:
   schedule:
-    # Every hour, at 17 minutes past. Upstream cut 0.1.0, 0.1.1 and 0.1.2
-    # inside four days, and the point of `next` is to have the move waiting
-    # when a release lands, not a day later. Off the top of the hour, when
-    # scheduled runs queue up behind everyone else's.
-    - cron: "17 * * * *"
+    # Once a day, at 06:17 UTC: off the top of the hour, when scheduled runs
+    # queue up behind everyone else's.
+    - cron: "17 6 * * *"
   workflow_dispatch:
     inputs:
+      version:
+        description: "OpenShell release to bump to, without the v (0.2.0 or 0.2.0-pre.1). Empty: the newest stable release above main's pin"
+        type: string
+        default: ""
       dry_run:
         description: "Dry run: say what would be done; push, open and edit nothing"
         type: boolean
@@ -96,8 +84,8 @@ on:
 # Nothing by default. Every job asks for exactly what it uses.
 permissions: {}
 
-# `next`, its pull request and the issue are singletons; two runs that can
-# write them would fight over them, so runs on main queue behind each other. A
+# A bump branch and the issue are written by one run at a time, so runs on main
+# queue behind each other. A
 # run from any other ref is a dry run that touches none of them. It gets a
 # group of its own: GitHub keeps only ONE pending run per group, so two dry
 # runs in the shared group could cancel the scheduled run that was waiting.
@@ -114,8 +102,8 @@ env:
 jobs:
   plan:
     name: What is upstream ahead of main?
-    # A fork inherits this file. On a schedule it must not start keeping a
-    # `next` branch of its own; someone who starts it by hand there meant to.
+    # A fork inherits this file. On a schedule it must not start opening bumps
+    # of its own; someone who starts it by hand there meant to.
     if: ${{ github.event_name != 'schedule' || !github.event.repository.fork }}
     runs-on: ubuntu-latest
     permissions:
@@ -126,131 +114,177 @@ jobs:
       ready: ${{ steps.plan.outputs.ready }}
       target: ${{ steps.plan.outputs.target }}
       same_line: ${{ steps.plan.outputs.same_line }}
+      bump: ${{ steps.plan.outputs.bump }}
+      branch: ${{ steps.plan.outputs.branch }}
       gateway_image: ${{ steps.plan.outputs.gateway_image }}
       supervisor_image: ${{ steps.plan.outputs.supervisor_image }}
       sandbox_image: ${{ steps.plan.outputs.sandbox_image }}
       config_schema: ${{ steps.plan.outputs.config_schema }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Unit-test the upstream logic
         run: python3 -m unittest discover -s deploy/ci/upstream
 
       # Upstream's tags (git ls-remote) and the digests the target's images
       # have right now (docker buildx imagetools inspect). Resolved once, here,
-      # so check A tests exactly the images `next` pins even if upstream pushes
-      # a tag again while the run is going.
+      # so check A tests exactly the images the bump pins even if upstream
+      # pushes a tag again while the run is going.
       - name: Find the release to follow
         id: plan
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          $FOLLOW plan --dry-run "$DRY_RUN" --out /tmp/upstream/plan.json --summary /tmp/upstream/plan.md
+          $FOLLOW plan --version "$VERSION" --dry-run "$DRY_RUN" --out /tmp/upstream/plan.json --summary /tmp/upstream/plan.md
           cat /tmp/upstream/plan.md >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: upstream-plan
           path: /tmp/upstream/plan.json
           if-no-files-found: error
           retention-days: 7
 
-  # The only job that can write to the repository, so it is the one that must
-  # not run anything from upstream. It builds nothing, tests nothing and
-  # starts no container. What it runs: git; `go get` and `go mod tidy`, which
-  # download modules and execute none of them; a registry lookup when a lock
-  # file has to be regenerated; and this repository's own scripts, from the
-  # commit the workflow runs at.
-  #
-  # The token is not in the job's environment and is not left in the checkout
-  # (persist-credentials: false). Two steps are handed it: the one that lists
-  # the pull requests from `next`, and the one that publishes. Everything that
-  # reaches the network for modules runs between them, without it.
-  #
-  # The work is done in a scratch worktree on a detached HEAD. Nothing is
-  # pushed until all of it has succeeded, so a rebase that stops on a conflict
-  # leaves `next` exactly as it was.
-  next:
-    name: Keep next on the upcoming release
+  # Makes the bump commit. It holds no write token and needs no environment,
+  # so it runs from any ref: a dry run anywhere previews the bump in full. It
+  # runs git; `go get`, `go mod tidy` and `go list -m`, which download modules
+  # and execute none of them; and this repository's own scripts. The commit is
+  # handed to publish-bump as a git bundle.
+  bump:
+    name: Make the bump to OpenShell ${{ needs.plan.outputs.target }}
     needs: plan
+    if: needs.plan.outputs.bump == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: write        # push next; create release/<line> before a new minor merges
-      pull-requests: write   # open, rewrite, comment on or close the pull request from next
+      contents: read
+      pull-requests: read   # which pull requests have come from the bump branch
     env:
       GH_REPO: ${{ github.repository }}
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}
-      # 'true' or 'false', never the secret: the pull request says whether CI
-      # will start by itself.
-      HAS_BOT_TOKEN: ${{ secrets.UPSTREAM_BOT_TOKEN != '' }}
-      AUTOMERGE: ${{ vars.UPSTREAM_AUTOMERGE == 'true' }}
+      BRANCH: ${{ needs.plan.outputs.branch }}
+    outputs:
+      made: ${{ steps.bump.outputs.made }}
     steps:
-      # Every branch and all of history: `next` is rebased onto main, and
-      # whether a release branch exists is read from what was fetched.
-      - uses: actions/checkout@v4
+      # Every branch: whether the bump branch exists is read from what was
+      # fetched.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           persist-credentials: false
-      # For `go get` and `go mod tidy` only. No cache is restored into a job
-      # that can write.
-      - uses: actions/setup-go@v5
+      # No cache is restored into a job whose result is published.
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: backend/go.mod
           cache: false
       # For scripts/readme-gateway-range.mjs only.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: upstream-plan
           path: /tmp/upstream
 
       # `--head` matches the branch NAME, in this repository and in every
       # fork, so what comes back is only a list of candidates. Which of them
-      # is ours is decided by publish.py from isCrossRepository. The merged
-      # ones say whether what is on `next` has already reached main.
-      - name: List the pull requests from next
+      # is ours is decided by publish.py from isCrossRepository.
+      - name: List the pull requests from the bump branch
         env:
-          GH_TOKEN: ${{ secrets.UPSTREAM_BOT_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh pr list --head next --base main --state open --limit 100 \
-            --json number,title,body,isDraft,headRefName,headRefOid,baseRefName,isCrossRepository,autoMergeRequest,comments \
-            > /tmp/upstream/open.json
-          gh pr list --head next --base main --state merged --limit 100 \
-            --json number,headRefName,headRefOid,baseRefName,isCrossRepository \
-            > /tmp/upstream/merged.json
+          gh pr list --head "$BRANCH" --state all --limit 100 \
+            --json number,headRefName,isCrossRepository,state,url \
+            > /tmp/upstream/pulls.json
 
-      # No token here. Decides everything and pushes nothing: it leaves the
-      # commit `next` should be on under a local ref, and the steps to take on
-      # GitHub in publish.json.
-      - name: Build what next should be
+      - name: Make the bump commit
+        id: bump
         env:
           # setup-go pins the toolchain to the one it installed. A release
           # whose SDK needs a newer Go has to be able to say so in go.mod, or
-          # `next` could not be made for it at all; check B then shows what
-          # else has to follow.
+          # the bump could not be made for it at all; CI on the bump then
+          # shows what else has to follow.
           GOTOOLCHAIN: auto
         run: |
           set -euo pipefail
-          $FOLLOW next --plan /tmp/upstream/plan.json \
-            --open-prs /tmp/upstream/open.json --merged-prs /tmp/upstream/merged.json \
-            --has-bot-token "$HAS_BOT_TOKEN" --automerge "$AUTOMERGE" --repo-url "$REPO_URL" \
-            --dry-run "$DRY_RUN" --out /tmp/upstream/next
-          cat /tmp/upstream/next/summary.md >> "$GITHUB_STEP_SUMMARY"
+          $FOLLOW bump --plan /tmp/upstream/plan.json --pulls /tmp/upstream/pulls.json \
+            --repo-url "$REPO_URL" --dry-run "$DRY_RUN" --out /tmp/upstream/bump
+          cat /tmp/upstream/bump/summary.md >> "$GITHUB_STEP_SUMMARY"
 
-      # `publish` runs `git push` and `gh` with the arguments the step above
-      # chose, and nothing else. In a dry run it prints them.
-      - name: Push next and keep its pull request
+      - name: Bundle the bump commit for publish-bump
+        if: steps.bump.outputs.made == 'true'
+        run: git bundle create /tmp/upstream/bump/bump.bundle refs/upstream/bump
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: upstream-bump
+          path: /tmp/upstream/bump
+          if-no-files-found: error
+          retention-days: 7
+
+  # Pushes the bump and opens its pull request, with a token of the bump-bot
+  # App. Its secrets are in the `bump-bot` environment, which only main can
+  # use, so this job runs only for a run on main that is not a dry run. It
+  # builds nothing and fetches no module: it checks main out as it is NOW,
+  # refuses a bump main has caught up with, takes the commit from the bundle,
+  # and only then asks for the token, which only the publishing step is handed.
+  publish-bump:
+    name: Open the bump to OpenShell ${{ needs.plan.outputs.target }}
+    needs: [plan, bump]
+    # The same test as DRY_RUN above, which a job-level `if` cannot read.
+    if: needs.bump.outputs.made == 'true' && github.ref == 'refs/heads/main' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+    runs-on: ubuntu-latest
+    environment: bump-bot
+    permissions:
+      contents: read
+    steps:
+      # main as it is now, not as the plan found it.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: upstream-plan
+          path: /tmp/upstream
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: upstream-bump
+          path: /tmp/upstream/bump
+
+      # The bump commit was made from main as it was when the run started. If
+      # main's pin has reached or passed the target since, publishing would
+      # move main back, and the bot never refreshes a bump branch.
+      - name: Refuse a bump main has caught up with
+        run: $FOLLOW check-forward --plan /tmp/upstream/plan.json --pins deploy/ci/gateway-pins.json
+
+      - name: Take the bump commit from the bundle
+        run: git fetch -q /tmp/upstream/bump/bump.bundle refs/upstream/bump:refs/upstream/bump
+
+      # A token of the bump-bot App, limited to this repository and to what
+      # the step after it does with it.
+      - name: Get a token for the bump-bot App
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.BUMP_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.BUMP_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # `publish` runs `git push` and `gh` with the arguments the bump job
+      # chose, and nothing else.
+      - name: Push the branch and open the pull request
         env:
-          GH_TOKEN: ${{ secrets.UPSTREAM_BOT_TOKEN || github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
           status=0
-          $FOLLOW publish --plan /tmp/upstream/next/publish.json --dry-run "$DRY_RUN" \
-            --summary /tmp/upstream/next/published.md || status=$?
-          if [ -f /tmp/upstream/next/published.md ]; then
-            cat /tmp/upstream/next/published.md >> "$GITHUB_STEP_SUMMARY"
+          $FOLLOW publish --plan /tmp/upstream/bump/publish.json --dry-run "$DRY_RUN" \
+            --summary /tmp/upstream/bump/published.md || status=$?
+          if [ -f /tmp/upstream/bump/published.md ]; then
+            cat /tmp/upstream/bump/published.md >> "$GITHUB_STEP_SUMMARY"
           fi
           exit "$status"
 
@@ -282,8 +316,8 @@ jobs:
       # proves it did not.
       GOFLAGS: -mod=readonly
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
@@ -357,7 +391,7 @@ jobs:
           $FOLLOW record-check --pull "$PULL" --stack "$STACK" --bff "$BFF" --compat "$COMPAT" \
             --out /tmp/upstream/check-a.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: upstream-check-a
           path: /tmp/upstream/check-a.json
@@ -393,12 +427,12 @@ jobs:
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: upstream-plan
           path: /tmp/upstream
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         # No result is a state the report handles: check A was skipped, or it
         # broke before it could record one.
         continue-on-error: true

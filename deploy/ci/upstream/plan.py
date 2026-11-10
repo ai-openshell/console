@@ -1,8 +1,17 @@
 """What is upstream ahead of this branch, and what would moving to it pin?
 
 One run of the workflow answers this once, in a job that can only read, and
-every later job works from the answer: the `next` job pins exactly the image
+every later job works from the answer: the `bump` job pins exactly the image
 digests check A tested, even if upstream re-pushes a tag in between.
+
+Two answers come out of it:
+
+  target   the release check A tests main against. On a schedule, the newest
+           stable release above the pin, else the newest pre-release leading
+           up to a release above it. When a person asks for a version, that.
+  bump     whether to open a bump branch for the target. A scheduled run
+           bumps only to a stable release; a version a person asked for is
+           bumped to whatever it is, so a pre-release gets a prep branch.
 
 Nothing here opens a socket. The network is the Upstream object passed in.
 """
@@ -40,11 +49,36 @@ def _pin_on_tag(doc, tags):
     return tagged.startswith(commit)
 
 
-def build(doc, upstream):
+BRANCH_PREFIX = "bump/openshell-"
+
+
+def branch_name(version):
+    """The branch a bump to this release is made on."""
+    return BRANCH_PREFIX + version
+
+
+def _requested(found, pinned, version):
+    """The release a person asked for, checked against what upstream has."""
+    if versions.parse(version) is None:
+        raise PlanError(
+            "%r is not an OpenShell release. Write it as X.Y.Z or X.Y.Z-pre.N, without the leading v." % version
+        )
+    match = [release for release in found if release["version"] == version]
+    if not match:
+        raise PlanError("upstream has no tag v%s. Nothing was bumped." % version)
+    if versions.order(version) <= versions.order(pinned):
+        raise PlanError(
+            "main already pins OpenShell %s, which is not below %s. A bump only moves forward." % (pinned, version)
+        )
+    return match[0]
+
+
+def build(doc, upstream, requested=None):
     """Everything one run needs to know, as plain data.
 
     doc: the pins of the branch the workflow runs on, which is `main` for
     every run that acts.
+    requested: a release a person asked to bump to (no leading v), or None.
     """
     problems = pins.validate(doc)
     if problems:
@@ -69,10 +103,14 @@ def build(doc, upstream):
         "config_schema": doc["config_schema"],
         "sandbox_image": doc["sandbox_image"],
         "newest_stable": next((release["version"] for release in found if release["stable"]), None),
+        "requested": requested or None,
         "target": None,
     }
 
-    target = versions.select_target(pinned, found)
+    if requested:
+        target = _requested(found, pinned, requested)
+    else:
+        target = versions.select_target(pinned, found)
     if target is None:
         return plan
 
@@ -98,10 +136,10 @@ def build(doc, upstream):
             ),
             key=versions.order,
         ),
-        # The branch that keeps the line `main` is about to leave. It is made
-        # when the move is to a stable release, which is the first moment the
-        # pull request could merge.
-        "release_branch": "release/%s" % versions.line(pinned) if new_line and target["stable"] else None,
+        # A schedule bumps only to a stable release. A version a person asked
+        # for is bumped to as it is: a pre-release gets a prep branch.
+        "bump": bool(requested) or target["stable"],
+        "branch": branch_name(target["version"]),
         "gateway_image": gateway,
         "supervisor_image": supervisor,
         "ready": waiting_for is None,

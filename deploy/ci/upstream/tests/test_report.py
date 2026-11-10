@@ -3,7 +3,6 @@
 import re
 import unittest
 
-import nextbranch
 import plan as plan_module
 import report
 from tests import support
@@ -46,7 +45,7 @@ class CommitMessage(unittest.TestCase):
     def test_it_ends_with_the_trailer_the_commit_is_found_by(self):
         text = self.message(TODAY)
         self.assertTrue(text.endswith("\n\nOpenShell-Release: 0.1.4-pre.2\n"))
-        self.assertEqual(nextbranch.TRAILER_RE.search(text).group(1), "0.1.4-pre.2")
+        self.assertEqual(re.search(r"(?m)^OpenShell-Release: (\S+)$", text).group(1), "0.1.4-pre.2")
 
     def test_it_says_where_from_where_to_and_which_commit(self):
         text = " ".join(self.message(TODAY).split())
@@ -160,7 +159,7 @@ class Issue(unittest.TestCase):
             self.assertIn("is on release line `0.2.x`; `main` is for `0.1.x`", body)
             self.assertNotIn("Report it upstream", body)
             self.assertNotIn("report it upstream now", body)
-            self.assertIn("Do the work on `next`", body)
+            self.assertIn("Wait for the stable release", body)
 
 
 class Summaries(unittest.TestCase):
@@ -202,32 +201,64 @@ class Summaries(unittest.TestCase):
         self.assertIn("left as it is", report.check_summary(TODAY, unknown))
 
 
-class NextSummary(unittest.TestCase):
-    def outcome(self, action, **more):
-        base = {"action": action, "reason": "the pin moves to OpenShell 0.1.4-pre.2", "main": "a" * 40, "next": None, "sha": None, "regenerated": [], "conflict": None}
-        base.update(more)
-        return base
+class PullRequestBody(unittest.TestCase):
+    def test_it_says_the_bot_made_it_and_people_finish_it(self):
+        body = report.pr_body(STABLE, REPO_URL)
+        self.assertTrue(body.startswith(report.PR_MARKER))
+        self.assertIn("will not touch it again", body)
+        self.assertIn("from OpenShell `0.1.3` to `0.1.4`", body)
+        self.assertIn(STABLE["target"]["gateway_image"], body)
+        self.assertIn(REPO_URL + "/blob/main/.github/workflows/follow-upstream.yml", body)
 
-    def test_each_action_reads_as_what_happened(self):
-        empty = {"pr": None}
-        self.assertIn("`next` created from `main` at `aaaaaaaaaaaa`", report.next_summary(self.outcome("create", sha="c" * 40), empty))
-        self.assertIn("force-pushed (with lease): the pin moves", report.next_summary(self.outcome("update", sha="c" * 40), empty))
-        self.assertIn("left as it is", report.next_summary(self.outcome("none"), empty))
-        self.assertIn("deleted", report.next_summary(self.outcome("delete"), empty))
-        conflict = self.outcome("conflict", reason="next could not be rebased onto main", conflict={"files": ["b.txt", "a.txt"], "stage": "rebase"})
-        self.assertIn("In conflict: `a.txt`, `b.txt`. `next` is left exactly as it was.", report.next_summary(conflict, empty))
+    def test_it_says_merging_releases_nothing(self):
+        body = " ".join(report.pr_body(STABLE).split())
+        self.assertIn("cut a release by hand", body)
+        self.assertNotIn("next", body.replace("next-version", ""))
 
-    def test_a_dry_run_says_would(self):
-        publish = {"pr": {"number": None, "title": "fix: move to OpenShell 0.1.4-pre.2", "draft": True}}
-        text = report.next_summary(self.outcome("create", sha="c" * 40), publish, dry_run=True)
-        self.assertIn("`next` would be created", text)
-        self.assertIn("A draft pull request `next` -> `main` would be opened: `fix: move to OpenShell 0.1.4-pre.2`", text)
+    def test_a_pre_release_is_a_prep_branch_that_cannot_merge(self):
+        body = " ".join(report.pr_body(TODAY).split())
+        self.assertIn("A pre-release: this is a prep branch.", body)
+        self.assertIn("until upstream releases `0.1.4`", body)
+        self.assertNotIn("prep branch", report.pr_body(STABLE))
 
-    def test_regenerated_lock_files_and_the_release_branch_are_listed(self):
-        publish = {"pr": None, "release_branch": {"name": "release/0.1", "sha": "a" * 40}}
-        text = report.next_summary(self.outcome("update", sha="c" * 40, regenerated=["backend/go.sum", "backend/go.sum"]), publish)
-        self.assertIn("Regenerated after a conflict: `backend/go.sum`.", text)
-        self.assertIn("`release/0.1` created from `main` at `aaaaaaaaaaaa`", text)
+    def test_a_new_line_says_how_to_keep_the_old_one(self):
+        body = " ".join(report.pr_body(NEW_LINE_STABLE).split())
+        self.assertIn("This starts gateway release line `0.2.x`.", body)
+        self.assertIn("git push origin origin/main:refs/heads/release/0.1", body)
+        self.assertNotIn("release line", report.pr_body(STABLE))
+
+
+class BumpSummary(unittest.TestCase):
+    OUTCOME = {"action": "create", "reason": "", "main": "a" * 40, "sha": "c" * 40}
+
+    def test_a_skip_says_why(self):
+        text = report.bump_summary(self.OUTCOME, {"skip": "pull request #7 (open) already came from `b`"})
+        self.assertIn("Nothing done: pull request #7 (open) already came from `b`.", text)
+
+    def test_a_bump_lists_the_branch_and_the_pull_request(self):
+        publish = {"skip": None, "branch": "bump/openshell-0.1.4", "pr": {"title": "fix: move to OpenShell 0.1.4"}}
+        text = report.bump_summary(self.OUTCOME, publish)
+        self.assertIn("`bump/openshell-0.1.4` pushed: main at `aaaaaaaaaaaa` plus one commit, `cccccccccccc`.", text)
+        self.assertIn("A pull request into `main` opened: `fix: move to OpenShell 0.1.4`.", text)
+        self.assertIn("would be pushed", report.bump_summary(self.OUTCOME, publish, dry_run=True))
+
+    def test_the_plan_summary_names_the_branch_or_says_how_to_make_one(self):
+        self.assertIn("Bump branch: `bump/openshell-0.1.4`.", report.plan_summary(STABLE))
+        self.assertIn("run this workflow by hand with `version` `0.1.4-pre.2`", report.plan_summary(TODAY))
+
+
+class IssueSaysWhatToDo(unittest.TestCase):
+    def test_a_pre_release_points_at_a_prep_branch(self):
+        _, body = report.issue_text(TODAY, RUN_URL, REPO_URL)
+        flat = " ".join(body.split())
+        self.assertIn("run the Follow upstream workflow by hand with `version` `0.1.4-pre.2`", flat)
+        self.assertIn("bump/openshell-0.1.4-pre.2", flat)
+        self.assertNotIn("`next`", body)
+
+    def test_a_new_line_says_wait_or_start_now(self):
+        _, body = report.issue_text(NEW_LINE, RUN_URL, REPO_URL)
+        self.assertIn("Wait for the stable release", body)
+        self.assertNotIn("`next`", body)
 
 
 if __name__ == "__main__":

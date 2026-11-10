@@ -58,9 +58,9 @@ class CheckedInPinsFile(unittest.TestCase):
 
     def test_the_comment_describes_the_file_as_it_is(self):
         comment = " ".join(self.doc["_comment"])
-        for word in ("release", "sdk", "gateway_image", "supervisor_image", "sandbox_image", "config_schema", "next"):
+        for word in ("release", "sdk", "gateway_image", "supervisor_image", "sandbox_image", "config_schema", "bump/openshell-"):
             self.assertIn(word, comment)
-        for gone in ("lanes", "floor", "ceiling", "sweep", "axis"):
+        for gone in ("lanes", "floor", "ceiling", "sweep", "axis", "`next`"):
             self.assertNotIn(gone, comment)
 
 

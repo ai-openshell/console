@@ -176,6 +176,22 @@ class Plan(Cli):
         _, outputs, _ = self.plan(tags=["v0.2.0"], images=images)
         self.assertEqual((outputs["target"], outputs["same_line"]), ("0.2.0", "false"))
 
+    def test_a_version_asked_for_reaches_the_plan_and_the_outputs(self):
+        pins_path = self.pins_file(support.pins_of_2026_10_09())
+        go_mod = self.write("backend/go.mod", "require %s %s\n" % (pins.SDK_MODULE, support.pins_of_2026_10_09()["sdk"]))
+        images = {"gateway:0.1.4-pre.1": support.digest("g"), "supervisor:0.1.4-pre.1": support.digest("s")}
+        fake = support.FakeUpstream(support.upstream_data(images=images))
+        with mock.patch.object(follow.upstream_module, "Upstream", lambda: fake):
+            code, _, _, outputs = self.run_cli(
+                "plan", "--pins", pins_path, "--go-mod", go_mod, "--version", "0.1.4-pre.1", "--out", self.path("plan.json")
+            )
+        self.assertEqual(code, 0)
+        self.assertEqual((outputs["target"], outputs["bump"], outputs["branch"]), ("0.1.4-pre.1", "true", "bump/openshell-0.1.4-pre.1"))
+
+    def test_a_schedule_does_not_bump_to_a_pre_release(self):
+        _, outputs, _ = self.plan()
+        self.assertEqual((outputs["target"], outputs["bump"]), ("0.1.4-pre.2", "false"))
+
     def test_an_outage_fails_the_command(self):
         pins_path = self.pins_file(support.pins_of_2026_10_09())
         go_mod = self.write("backend/go.mod", "require %s %s\n" % (pins.SDK_MODULE, support.pins_of_2026_10_09()["sdk"]))
@@ -191,8 +207,10 @@ class Plan(Cli):
         self.assertFalse(os.path.exists(self.path("plan.json")))
 
 
-class Next(Cli):
-    """`next` and `publish` in a dry run, against a throwaway repository."""
+class Bump(Cli):
+    """`bump` and `publish`, against a throwaway repository."""
+
+    BRANCH = "bump/openshell-0.1.4"
 
     def setUp(self):
         Cli.setUp(self)
@@ -200,167 +218,169 @@ class Next(Cli):
         self.addCleanup(self.repo.close)
         self.tools = support.FakeTools()
 
-    def plan_file(self, target, pinned="0.1.3"):
+    def plan_file(self, target, pinned="0.1.3", bump=True):
+        if target is not None:
+            target = dict(target, same_line=True, skipped=[], bump=bump, branch="bump/openshell-" + target["version"])
         made = {
             "pinned": {"release": pinned, "line": "0.1", "stable": True, "sdk": support.pins_doc(pinned)["sdk"], "sdk_on_tag": True},
             "config_schema": "v2",
             "sandbox_image": support.SANDBOX,
             "newest_stable": pinned,
-            "target": target and dict(target, same_line=True, skipped=[], release_branch=None),
+            "requested": None,
+            "target": target,
         }
         return self.write("plan.json", made)
 
-    def next(self, target, *more):
+    def bump(self, target, *more, **plan):
         args = follow.build_parser().parse_args(
-            ["next", "--plan", self.plan_file(target), "--repo", self.repo.path, "--tools", "/tools",
-             "--main-ref", "refs/remotes/origin/main", "--out", self.path("next"),
+            ["bump", "--plan", self.plan_file(target, **plan), "--repo", self.repo.path, "--tools", "/tools",
+             "--main-ref", "refs/remotes/origin/main", "--out", self.path("bump"),
              "--repo-url", "https://github.com/o/r"] + list(more)
         )
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            code = follow.cmd_next(args, run=self.tools)
-        return code, out.getvalue(), json.loads(self.read("next", "outcome.json")), json.loads(self.read("next", "publish.json"))
+            code = follow.cmd_bump(args, run=self.tools)
+        return code, out.getvalue(), json.loads(self.read("bump", "outcome.json")), json.loads(self.read("bump", "publish.json"))
 
-    def test_the_first_run_would_create_next_and_open_a_draft(self):
-        code, out, outcome, decided = self.next(support.target("0.1.4-pre.2"), "--dry-run", "true")
+    def test_a_stable_release_makes_one_signed_off_commit_on_main(self):
+        code, out, outcome, decided = self.bump(support.target("0.1.4"), "--dry-run", "true")
         self.assertEqual(code, 0)
         self.assertEqual(outcome["action"], "create")
-        self.assertEqual(decided["push"]["expected"], "")
-        self.assertEqual(decided["pr"]["title"], "fix: move to OpenShell 0.1.4-pre.2")
-        self.assertTrue(decided["pr"]["draft"])
-        self.assertIn("`next` would be created from `main`", out)
-        self.assertIn("A draft pull request `next` -> `main` would be opened", out)
-        self.assertEqual(out.strip().splitlines()[-1][:2], "- ", "the summary is the last thing printed")
-        self.assertIsNone(self.repo.origin_next(), "preparing pushes nothing")
+        self.assertEqual(outcome["main"], self.repo.rev("origin/main"))
+        self.assertEqual(self.repo.log("origin/main", outcome["sha"]), ["fix: move to OpenShell 0.1.4"])
+        message = self.repo.git("log", "-1", "--format=%B", outcome["sha"])
+        self.assertIn("OpenShell-Release: 0.1.4", message)
+        self.assertIn("Signed-off-by: github-actions[bot]", message)
+        self.assertEqual(json.loads(self.repo.read(pinmove.PINS, outcome["sha"]))["release"], "0.1.4")
+        self.assertEqual(decided["branch"], self.BRANCH)
+        self.assertEqual(decided["push"], {"sha": outcome["sha"]})
+        self.assertEqual(decided["pr"]["title"], "fix: move to OpenShell 0.1.4")
+        self.assertEqual(decided["compare"], "https://github.com/o/r/compare/main...%s?expand=1" % self.BRANCH)
+        self.assertIn("would be pushed", out)
+        self.assertIsNone(self.repo.origin_branch(self.BRANCH), "preparing pushes nothing")
+
+    def test_it_says_whether_there_is_a_commit_to_publish(self):
+        plan_path = self.plan_file(support.target("0.1.4"))
+        with mock.patch.object(follow.pinmove, "run_command", self.tools):
+            _, _, _, outputs = self.run_cli(
+                "bump", "--plan", plan_path, "--repo", self.repo.path, "--main-ref", "refs/remotes/origin/main", "--out", self.path("bump")
+            )
+        self.assertEqual(outputs["made"], "true")
+        self.assertEqual(len(outputs["sha"]), 40)
+        self.repo.push_branch(self.repo.rev("origin/main"), self.BRANCH)
+        _, _, _, outputs = self.run_cli(
+            "bump", "--plan", plan_path, "--repo", self.repo.path, "--main-ref", "refs/remotes/origin/main", "--out", self.path("bump2")
+        )
+        self.assertEqual((outputs["made"], outputs["sha"]), ("false", ""))
 
     def test_publish_in_a_dry_run_prints_the_commands_and_runs_none(self):
-        self.next(support.target("0.1.4-pre.2"), "--dry-run", "true")
+        self.bump(support.target("0.1.4"), "--dry-run", "true")
         with mock.patch.object(follow.publish_module, "run_command", side_effect=AssertionError("ran something")):
             code, out, err, _ = self.run_cli(
-                "publish", "--plan", self.path("next", "publish.json"), "--dry-run", "true", "--summary", self.path("published.md")
+                "publish", "--plan", self.path("bump", "publish.json"), "--dry-run", "true", "--summary", self.path("published.md")
             )
         self.assertEqual((code, err), (0, ""))
-        self.assertIn("would run: git push --force-with-lease=refs/heads/next: origin ", out)
-        self.assertIn("would run: gh pr create --head next --base main --title fix: move to OpenShell 0.1.4-pre.2", out)
-        self.assertEqual(self.read("published.md"), "")
-        self.assertIsNone(self.repo.origin_next())
+        self.assertIn("would run: git push --force-with-lease=refs/heads/%s: origin " % self.BRANCH, out)
+        self.assertNotIn("gh workflow run", out)
+        self.assertIn("would run: gh pr create --head %s --base main --title fix: move to OpenShell 0.1.4" % self.BRANCH, out)
+        self.assertIsNone(self.repo.origin_branch(self.BRANCH))
 
-    def test_the_pull_request_listings_and_the_flags_reach_the_decision(self):
-        first = self.next(support.target("0.1.4-pre.1"))[2]
-        self.repo.publish(first["sha"])
-        merged = self.write("merged.json", [])
-        opened = self.write(
-            "open.json",
-            [{"number": 9, "title": "old", "body": "", "isDraft": False, "headRefName": "next", "headRefOid": first["sha"],
-              "baseRefName": "main", "isCrossRepository": False, "comments": []}],
-        )
-        _, _, outcome, decided = self.next(
-            support.target("0.1.4-pre.2"), "--open-prs", opened, "--merged-prs", merged, "--has-bot-token", "true", "--automerge", "true"
-        )
-        self.assertEqual(outcome["action"], "update")
-        self.assertEqual(decided["push"]["expected"], first["sha"])
-        self.assertEqual((decided["pr"]["number"], decided["pr"]["set_title"], decided["pr"]["set_draft"]), (9, True, "draft"))
-        self.assertNotIn("does not start by itself", decided["pr"]["body"])
-        self.assertFalse(decided["automerge"], "a pre-release is never set to merge")
+    def test_a_branch_that_exists_is_left_alone_and_nothing_is_moved(self):
+        self.repo.push_branch(self.repo.rev("origin/main"), self.BRANCH)
+        _, out, outcome, decided = self.bump(support.target("0.1.4"))
+        self.assertEqual(outcome["action"], "none")
+        self.assertEqual(self.tools.calls, [], "the pins are not moved when there is nothing to publish")
+        self.assertIn("exists already", decided["skip"])
+        self.assertIsNone(decided["push"])
+        self.assertIn("Nothing done", out)
 
-    def test_a_merged_pull_request_at_the_commit_next_is_on_makes_it_spent(self):
-        first = self.next(support.target("0.1.4"))[2]
-        self.repo.publish(first["sha"])
-        merged = self.write(
-            "merged.json",
-            [{"number": 9, "headRefName": "next", "headRefOid": first["sha"], "baseRefName": "main", "isCrossRepository": False}],
-        )
-        _, out, outcome, decided = self.next(None, "--merged-prs", merged)
-        self.assertEqual(outcome["action"], "delete")
-        self.assertEqual(decided["delete"]["expected"], first["sha"])
-        self.assertIn("its pull request was merged", out)
+    def test_any_pull_request_from_the_branch_in_this_repository_stops_it(self):
+        for state in ("OPEN", "CLOSED", "MERGED"):
+            pulls = self.write("pulls.json", [{"number": 12, "headRefName": self.BRANCH, "isCrossRepository": False, "state": state}])
+            _, _, _, decided = self.bump(support.target("0.1.4"), "--pulls", pulls)
+            self.assertEqual(decided["skip"], "pull request #12 (%s) already came from `%s`" % (state.lower(), self.BRANCH))
+        self.assertEqual(self.tools.calls, [])
+
+    def test_a_forks_pull_request_of_the_same_name_does_not(self):
+        pulls = self.write("pulls.json", [{"number": 12, "headRefName": self.BRANCH, "isCrossRepository": True, "state": "OPEN"}])
+        _, _, outcome, decided = self.bump(support.target("0.1.4"), "--pulls", pulls)
+        self.assertIsNone(decided["skip"])
+        self.assertEqual(outcome["action"], "create")
+
+    def test_no_bump_without_a_bump_target(self):
+        _, _, outcome, decided = self.bump(support.target("0.1.4-pre.2"), bump=False)
+        self.assertEqual((outcome["action"], decided["skip"]), ("none", "there is nothing to bump to"))
+        _, _, _, decided = self.bump(None)
+        self.assertEqual(decided["skip"], "there is nothing to bump to")
+        self.assertEqual(self.tools.calls, [])
 
     def test_a_target_whose_images_are_not_published_waits_and_touches_nothing(self):
         waiting = dict(support.target("0.1.4"), ready=False, waiting_for="upstream has tagged v0.1.4 but has not published its gateway image yet", gateway_image=None, supervisor_image=None)
-        _, out, outcome, decided = self.next(waiting)
-        self.assertEqual(outcome["action"], "none")
+        _, out, _, decided = self.bump(waiting)
         self.assertEqual(self.tools.calls, [])
-        self.assertEqual([decided[key] for key in ("push", "pr", "comment", "delete")], [None] * 4)
+        self.assertIsNone(decided["push"])
         self.assertIn("has not published its gateway image yet", out)
 
     def test_a_failing_tool_fails_the_command_and_leaves_no_decision_to_publish(self):
-        plan_path = self.plan_file(support.target("0.1.4-pre.2"))
+        plan_path = self.plan_file(support.target("0.1.4"))
         with mock.patch.object(follow.pinmove, "run_command", support.FakeTools(fail=("go", "get"))):
             code, _, err, _ = self.run_cli(
-                "next", "--plan", plan_path, "--repo", self.repo.path, "--main-ref", "refs/remotes/origin/main", "--out", self.path("next")
+                "bump", "--plan", plan_path, "--repo", self.repo.path, "--main-ref", "refs/remotes/origin/main", "--out", self.path("bump")
             )
         self.assertEqual(code, 1)
         self.assertIn("go get", err)
-        self.assertFalse(os.path.exists(self.path("next", "publish.json")))
+        self.assertFalse(os.path.exists(self.path("bump", "publish.json")))
+
+
+class CheckForward(Cli):
+    def check(self, pinned_now, target="0.1.4"):
+        plan_path = self.write("plan.json", {"target": dict(support.target(target))})
+        return self.run_cli("check-forward", "--plan", plan_path, "--pins", self.pins_file(support.pins_doc(pinned_now)))
+
+    def test_a_target_still_ahead_of_main_passes(self):
+        code, out, _, _ = self.check("0.1.3")
+        self.assertEqual(code, 0)
+        self.assertIn("still moves it forward", out)
+
+    def test_main_reaching_or_passing_the_target_is_refused(self):
+        for now in ("0.1.4", "0.1.5"):
+            code, _, err, _ = self.check(now)
+            self.assertEqual(code, 1, now)
+            self.assertIn("not below the bump's target 0.1.4", err)
+
+    def test_a_plan_without_a_target_is_refused(self):
+        plan_path = self.write("plan.json", {"target": None})
+        code, _, err, _ = self.run_cli("check-forward", "--plan", plan_path, "--pins", self.pins_file(support.pins_doc("0.1.3")))
+        self.assertEqual(code, 1)
+        self.assertIn("no target", err)
 
 
 class PublishFailure(Cli):
-    def test_a_refused_step_fails_the_command_and_says_so_in_the_summary(self):
-        decided = {"action": "update", "release_branch": None, "push": {"sha": "c" * 40, "expected": "b" * 40, "created": False},
-                   "pr": None, "comment": None, "automerge": False, "delete": None}
-        plan_path = self.write("publish.json", decided)
+    DECIDED = {
+        "branch": "bump/openshell-0.1.4", "skip": None, "push": {"sha": "c" * 40},
+        "pr": {"title": "fix: move to OpenShell 0.1.4", "body": "body\n"},
+        "compare": "https://github.com/o/r/compare/main...bump/openshell-0.1.4?expand=1",
+    }
+
+    def test_a_refused_push_fails_the_command_and_says_so_in_the_summary(self):
+        plan_path = self.write("publish.json", self.DECIDED)
         with mock.patch.object(follow.publish_module, "run_command", lambda command, env=None: (1, "", "remote: Permission denied")):
             code, _, err, _ = self.run_cli("publish", "--plan", plan_path, "--summary", self.path("published.md"))
         self.assertEqual(code, 1)
-        self.assertIn("could not push next", err)
+        self.assertIn("could not push bump/openshell-0.1.4", err)
         self.assertIn("**Publishing failed.**", self.read("published.md"))
 
+    def test_a_refused_pull_request_fails_with_the_link(self):
+        def run(command, env=None):
+            if command[:3] == ["gh", "pr", "create"]:
+                return 1, "", "HTTP 403: Resource not accessible by integration"
+            return 0, "", ""
 
-class CheckA(Cli):
-    def record(self, pull, stack, bff, compat):
-        code, _, _, _ = self.run_cli("record-check", "--pull", pull, "--stack", stack, "--bff", bff, "--compat", compat, "--out", self.path("check-a.json"))
-        self.assertEqual(code, 0)
-        return json.loads(self.read("check-a.json"))["outcome"]
-
-    def report(self, made, result="check-a.json", dry_run="false"):
-        plan_path = self.write("plan.json", made)
-        return self.run_cli(
-            "check-report", "--plan", plan_path, "--result", self.path(result), "--run-url", "https://github.com/o/r/actions/runs/7",
-            "--repo-url", "https://github.com/o/r", "--dry-run", dry_run, "--out", self.path("report"),
-        )
-
-    def today(self):
-        return plan_module.build(support.pins_of_2026_10_09(), support.FakeUpstream(support.upstream_data()))
-
-    def test_step_outcomes_become_one_result(self):
-        self.assertEqual(self.record("success", "success", "success", "success"), "passed")
-        self.assertEqual(self.record("success", "success", "success", "failure"), "failed")
-        self.assertEqual(self.record("success", "failure", "skipped", "skipped"), "stack_failed")
-
-    def test_a_failure_renders_the_issue_and_is_not_incomplete(self):
-        self.record("success", "success", "success", "failure")
-        code, _, _, outputs = self.report(self.today())
-        self.assertEqual(code, 0)
-        self.assertEqual(outputs, {"issue_action": "upsert", "incomplete": "0"})
-        self.assertEqual(self.read("report", "issue-title.txt"), "OpenShell 0.1.4-pre.2: main fails the compatibility suite\n")
-        self.assertIn("https://github.com/o/r/actions/runs/7", self.read("report", "issue-body.md"))
-        self.assertIn("FAILS", self.read("report", "summary.md"))
-
-    def test_a_pass_closes_with_a_comment_that_says_why(self):
-        self.record("success", "success", "success", "success")
-        _, _, _, outputs = self.report(self.today())
-        self.assertEqual(outputs, {"issue_action": "close", "incomplete": "0"})
-        comment = self.read("report", "close-comment.md")
-        self.assertTrue(comment.startswith("`main` passes the compatibility suite against OpenShell `0.1.4-pre.2`"))
-        self.assertIn("https://github.com/o/r/actions/runs/7", comment)
-        self.assertEqual(self.read("report", "issue-body.md"), "")
-
-    def test_a_job_that_never_reported_keeps_the_issue_and_marks_the_run(self):
-        _, _, _, outputs = self.report(self.today(), result="missing.json")
-        self.assertEqual(outputs, {"issue_action": "keep", "incomplete": "1"})
-
-    def test_a_gateway_that_did_not_start_is_not_a_finding(self):
-        self.record("success", "failure", "skipped", "skipped")
-        _, out, _, outputs = self.report(self.today())
-        self.assertEqual(outputs, {"issue_action": "keep", "incomplete": "1"})
-        self.assertIn("the gateway never became healthy", out)
-
-    def test_nothing_ahead_closes_and_needs_no_result(self):
-        made = plan_module.build(
-            support.pins_of_2026_10_09(), support.FakeUpstream(support.upstream_data(drop=("v0.1.4-pre.1", "v0.1.4-pre.2")))
-        )
-        _, _, _, outputs = self.report(made, result="missing.json")
-        self.assertEqual(outputs, {"issue_action": "close", "incomplete": "0"})
+        plan_path = self.write("publish.json", self.DECIDED)
+        with mock.patch.object(follow.publish_module, "run_command", run):
+            code, _, err, _ = self.run_cli("publish", "--plan", plan_path)
+        self.assertEqual(code, 1)
+        self.assertIn(self.DECIDED["compare"], err)
 
 
 class Errors(Cli):
@@ -370,7 +390,7 @@ class Errors(Cli):
             plan_module.PlanError("a plan problem"),
             upstream.UpstreamError("an upstream problem"),
             pinmove.PinMoveError("a move problem"),
-            follow.nextbranch.GitError("a git problem"),
+            follow.bump.GitError("a git problem"),
             follow.publish_module.PublishError("a publish problem"),
             follow.versions.VersionError("a version problem"),
         ):

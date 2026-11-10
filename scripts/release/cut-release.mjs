@@ -2,9 +2,9 @@
 // Cuts a dashboard release from the checked-out commit, or says what it would
 // cut.
 //
-// publish.yml runs this: for a person who started the workflow on main or on
-// release/<major>.<minor>, and for the merge of `next`. Whether to release was
-// decided before it runs. This works out which release it is:
+// publish.yml runs this when a person starts the workflow on main or on
+// release/<major>.<minor>. Nothing else starts a release. This works out which
+// release it is:
 //
 //   the version   <line>.<n>, from the OpenShell release this branch pins and
 //                 the release tags that exist (next-version.mjs). Nobody
@@ -25,8 +25,8 @@
 //
 //   - The checkout is shallow. The tags and the history are what everything
 //     here is worked out from.
-//   - The branch pins a pre-release. Only `next` does, and nothing is
-//     released from one.
+//   - The branch pins a pre-release. Only a bump branch that prepares for an
+//     upcoming OpenShell release does, and nothing is released from one.
 //   - The branch is release/X.Y and pins another line than X.Y.
 //   - The newest release of the line is not in this commit's history. Numbers
 //     on a line are given out in order, so a release from here would be
@@ -413,9 +413,9 @@ function main() {
     return;
   }
   // A release cannot be renumbered once it is out: its image tag is written
-  // once and its chart version is never pushed again. The merge of `next` is
-  // released with no dry run before it, so this is where a number that is
-  // known to be too high is stopped.
+  // once and its chart version is never pushed again, and a real run need not
+  // follow a dry run, so this is where a number that is known to be too high
+  // is stopped.
   if (plan.foreign.length > 0) {
     const tags = plan.foreign.map(({ tag }) => tag).join(', ');
     throw new Error(

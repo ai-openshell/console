@@ -12,7 +12,7 @@
 //   node scripts/readme-gateway-range.mjs --check   exit 1 when it is stale (CI)
 //
 // Whatever moves the pins runs --write in the same change. The Follow upstream
-// workflow does, when it moves `next` to a new upstream release: the block
+// workflow does, in the bump branch it makes for a new upstream release: the block
 // restates the release and the SDK, and a branch that left it stale could
 // never pass --check. It runs this copy of the script, from the commit the
 // workflow runs at, against the tree it is changing, which is what --readme

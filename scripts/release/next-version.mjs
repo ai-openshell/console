@@ -26,7 +26,8 @@
 const RELEASE_TAG = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 // What a branch can pin (deploy/ci/gateway-pins.json): a stable OpenShell
-// release, or on `next` a pre-release.
+// release, or, on a bump branch prepared ahead of an upstream release, a
+// pre-release.
 const STABLE_PIN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const PRE_RELEASE_PIN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-pre\.(0|[1-9]\d*)$/;
 
@@ -63,8 +64,9 @@ export function nextVersion({ pinned, tags }) {
   if (typeof pinned === 'string' && PRE_RELEASE_PIN.test(pinned)) {
     throw new Error(
       `this branch pins OpenShell ${pinned}, a pre-release. Nothing is released from a pre-release pin: ` +
-        'a console release is for a gateway release line that exists, and only `next` pins a pre-release. ' +
-        'The release is cut after `next` has moved to the stable release and merged.',
+        'a console release is for a gateway release line that exists. A pre-release pin is a bump branch ' +
+        'prepared ahead of an upstream release, and it cannot be released. Release once the move to the ' +
+        'stable OpenShell release has merged.',
     );
   }
   if (typeof pinned !== 'string' || !STABLE_PIN.test(pinned)) {

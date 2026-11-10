@@ -29,9 +29,12 @@ Start with `openshell/v1/` and `types/` in the pinned module version. Note:
 If the capability exists upstream but not in the **pinned** SDK, do not run
 `go get ...@latest` to reach it. The SDK moves with the gateway, to the commit
 of an upstream release tag, and the Follow upstream workflow makes that move
-on the `next` branch (ADR 0005, decision 7; see "SDK updates" in
-`.claude/rules/bff-go.md`). If the capability is in the upcoming release, the
-endpoint is work for `next`: branch from it and open the pull request into it.
+on a `bump/openshell-X.Y.Z` branch (ADR 0005, decision 7 and the amendment of
+2026-11-06; see "SDK updates" in `.claude/rules/bff-go.md`). If the capability
+is in the upcoming release, the endpoint is work for that release's bump
+branch, or, before upstream ships it, for a prep branch made by running Follow
+upstream with the pre-release as `version`. Do not start that run yourself:
+say what is needed and stop.
 Also check that the gateway this branch pins (`node scripts/gateway-range.mjs`
 prints its release) actually serves the RPC: a gateway answers gRPC
 `UNIMPLEMENTED` for an RPC it does not have.

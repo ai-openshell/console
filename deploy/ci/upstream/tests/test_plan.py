@@ -17,9 +17,9 @@ def images_for(*versions):
     return out
 
 
-def build(doc=None, **data):
+def build(doc=None, requested=None, **data):
     fake = support.FakeUpstream(support.upstream_data(**data))
-    return plan.build(doc or support.pins_of_2026_10_09(), fake), fake
+    return plan.build(doc or support.pins_of_2026_10_09(), fake, requested=requested), fake
 
 
 class UpstreamToday(unittest.TestCase):
@@ -40,8 +40,10 @@ class UpstreamToday(unittest.TestCase):
         self.assertEqual(target["commit"], "4c1b16a4a104581fb0afe8675feff34f00cc2ca8")
         self.assertFalse(target["stable"])
         self.assertEqual((target["base"], target["line"], target["same_line"]), ("0.1.4", "0.1", True))
-        self.assertIsNone(target["release_branch"])
         self.assertEqual(target["skipped"], [])
+        # A schedule does not bump to a pre-release; check A still tests it.
+        self.assertFalse(target["bump"])
+        self.assertEqual(target["branch"], "bump/openshell-0.1.4-pre.2")
 
     def test_its_images_are_resolved_to_digests_once(self):
         target = self.plan["target"]
@@ -60,6 +62,34 @@ class UpstreamToday(unittest.TestCase):
         self.assertEqual(self.plan["config_schema"], doc["config_schema"])
 
 
+class Requested(unittest.TestCase):
+    """A version a person asked for, from workflow_dispatch."""
+
+    def test_a_pre_release_asked_for_is_bumped_to_as_a_prep_branch(self):
+        made, _ = build(requested="0.1.4-pre.1", images=images_for("0.1.4-pre.1"))
+        target = made["target"]
+        self.assertEqual(made["requested"], "0.1.4-pre.1")
+        self.assertEqual((target["version"], target["stable"], target["bump"]), ("0.1.4-pre.1", False, True))
+        self.assertEqual(target["branch"], "bump/openshell-0.1.4-pre.1")
+
+    def test_it_wins_over_the_newest_release(self):
+        made, _ = build(requested="0.1.4", tags=["v0.1.4", "v0.1.5"], images=images_for("0.1.4"))
+        self.assertEqual(made["target"]["version"], "0.1.4")
+
+    def test_a_version_upstream_has_not_tagged_is_refused(self):
+        with self.assertRaisesRegex(plan.PlanError, "upstream has no tag v0.9.0"):
+            build(requested="0.9.0")
+
+    def test_a_version_that_is_not_above_the_pin_is_refused(self):
+        with self.assertRaisesRegex(plan.PlanError, "A bump only moves forward"):
+            build(requested="0.1.3")
+
+    def test_a_malformed_version_is_refused(self):
+        for text in ("v0.1.4", "latest", "0.1"):
+            with self.assertRaisesRegex(plan.PlanError, "without the leading v"):
+                build(requested=text)
+
+
 class Targets(unittest.TestCase):
     def test_nothing_ahead_is_no_target_and_no_lookup(self):
         made, fake = build(drop=("v0.1.4-pre.1", "v0.1.4-pre.2"))
@@ -70,25 +100,26 @@ class Targets(unittest.TestCase):
         made, _ = build(tags=["v0.1.4"], images=images_for("0.1.4"))
         target = made["target"]
         self.assertEqual((target["version"], target["stable"], target["same_line"]), ("0.1.4", True, True))
-        self.assertIsNone(target["release_branch"], "a patch release leaves no line behind")
+        self.assertTrue(target["bump"])
+        self.assertEqual(target["branch"], "bump/openshell-0.1.4")
 
     def test_stable_releases_in_between_are_skipped_and_said_so(self):
         made, _ = build(tags=["v0.1.4", "v0.1.5", "v0.1.6"], images=images_for("0.1.6"))
         self.assertEqual(made["target"]["version"], "0.1.6")
         self.assertEqual(made["target"]["skipped"], ["0.1.4", "0.1.5"])
 
-    def test_a_stable_release_that_starts_a_new_line_names_the_branch_for_the_old_one(self):
+    def test_a_stable_release_that_starts_a_new_line_is_bumped_to(self):
         made, _ = build(tags=["v0.2.0"], images=images_for("0.2.0"))
         target = made["target"]
         self.assertEqual((target["version"], target["line"], target["same_line"]), ("0.2.0", "0.2", False))
-        self.assertEqual(target["release_branch"], "release/0.1")
+        self.assertTrue(target["bump"])
+        self.assertNotIn("release_branch", target, "release branches are made by hand")
 
-    def test_a_pre_release_of_a_new_line_does_not_yet(self):
-        # The pull request cannot merge on a pre-release, so nothing has to exist yet.
+    def test_a_pre_release_of_a_new_line_is_tested_and_not_bumped_on_a_schedule(self):
         made, _ = build(tags=["v0.2.0-pre.1"], images=images_for("0.2.0-pre.1"))
         target = made["target"]
         self.assertEqual((target["version"], target["same_line"]), ("0.2.0-pre.1", False))
-        self.assertIsNone(target["release_branch"])
+        self.assertFalse(target["bump"])
 
     def test_a_tag_whose_images_are_not_published_yet_is_not_ready(self):
         made, _ = build(tags=["v0.1.4"])

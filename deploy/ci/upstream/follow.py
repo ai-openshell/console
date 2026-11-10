@@ -10,8 +10,9 @@ made here, where it can be unit-tested:
     format-pins      rewrite the pins file in canonical form
     require-stable   fail when the pins name a pre-release (main, release/**)
     plan             which upstream release is ahead of this branch, if any
-    next             build what `next` should be, and decide what to publish
-    publish          push it and keep its pull request (git push and gh only)
+    bump             make main plus the pin move, and decide what to publish
+    check-forward    refuse a bump that main has caught up with since the plan
+    publish          push the bump branch and open its pull request
     record-check     turn check A's step outcomes into a result
     check-report     what check A's result means; render its issue
 
@@ -25,7 +26,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import nextbranch  # noqa: E402
+import bump  # noqa: E402
 import pinmove  # noqa: E402
 import pins  # noqa: E402
 import plan as plan_module  # noqa: E402
@@ -138,7 +139,7 @@ def cmd_require_stable(args):
 
 def cmd_plan(args, upstream=None):
     doc = _load_valid_pins(args.pins, args.go_mod)
-    made = plan_module.build(doc, upstream or upstream_module.Upstream())
+    made = plan_module.build(doc, upstream or upstream_module.Upstream(), requested=args.version or None)
     _write(args.out, json.dumps(made, indent=2) + "\n")
     summary = report.plan_summary(made, dry_run=args.dry_run == "true")
     if args.summary:
@@ -153,6 +154,9 @@ def cmd_plan(args, upstream=None):
             "ready": "true" if target.get("ready") else "false",
             "target": target.get("version", ""),
             "same_line": "true" if target.get("same_line") else "false",
+            # Something to open a bump branch for, with images to pin.
+            "bump": "true" if target.get("bump") and target.get("ready") else "false",
+            "branch": target.get("branch", ""),
             "gateway_image": target.get("gateway_image") or "",
             "supervisor_image": target.get("supervisor_image") or "",
             "sandbox_image": made["sandbox_image"],
@@ -167,64 +171,73 @@ def _echo(text):
     sys.stdout.flush()
 
 
-def cmd_next(args, run=None):
+def cmd_bump(args, run=None):
     run = run or pinmove.run_command
     made = _json(args.plan)
     target = made.get("target")
     dry_run = args.dry_run == "true"
     repo = os.path.abspath(args.repo)
     tools = os.path.abspath(args.tools)
-    git = nextbranch.Git(repo)
-    existing = git.maybe("rev-parse", "--verify", "-q", "%s^{commit}" % args.next_ref)
+    git = bump.Git(repo)
+    main = git.out("rev-parse", "--verify", "%s^{commit}" % args.main_ref)
+    pulls = _json(args.pulls, [])
+    branch_sha = None
+    if target and target.get("branch"):
+        branch_sha = git.maybe("rev-parse", "--verify", "-q", "refs/remotes/origin/%s^{commit}" % target["branch"])
 
-    if target and not target["ready"]:
-        # Tagged, but its images are not out yet. Nothing can be pinned, and a
-        # rebase for its own sake can wait an hour with it.
-        outcome = {
-            "action": "none",
-            "reason": target["waiting_for"],
-            "main": git.out("rev-parse", "--verify", "%s^{commit}" % args.main_ref),
-            "next": existing,
-            "sha": None,
-            "people": [],
-            "pins": None,
-        }
-    else:
-        outcome = nextbranch.prepare(
+    outcome = {"action": "none", "reason": "", "main": main, "sha": None, "moved": None}
+    # Decided before any pin is moved: a branch that exists, or a pull request
+    # that came from it, means the bot is done with this release.
+    if publish_module.blocked(made, pulls, branch_sha) is None:
+        outcome = bump.prepare(
             repo,
             target,
             mover=lambda tree, to: pinmove.apply(tree, to, tools=tools, run=run, echo=_echo),
             message=lambda to, moved: report.commit_message(to, made["pinned"]),
-            lockfiles=nextbranch.lockfile_regenerators(run=run, echo=_echo),
             main_ref=args.main_ref,
-            next_ref=args.next_ref,
-            spent=publish_module.is_spent(_json(args.merged_prs, []), existing),
         )
+    decided = publish_module.build(made, outcome, pulls=pulls, branch_sha=branch_sha, repo_url=args.repo_url)
 
-    release_branch_sha = None
-    if target and target.get("release_branch"):
-        release_branch_sha = git.maybe(
-            "rev-parse", "--verify", "-q", "refs/remotes/origin/%s^{commit}" % target["release_branch"]
-        )
-    decided = publish_module.build(
-        made,
-        outcome,
-        open_pulls=_json(args.open_prs, []),
-        has_bot_token=args.has_bot_token == "true",
-        automerge=args.automerge == "true",
-        repo_url=args.repo_url,
-        release_branch_sha=release_branch_sha,
-    )
     _write(os.path.join(args.out, "outcome.json"), json.dumps(outcome, indent=2) + "\n")
     _write(os.path.join(args.out, "publish.json"), json.dumps(decided, indent=2) + "\n")
-    summary = report.next_summary(outcome, decided, dry_run=dry_run)
+    summary = report.bump_summary(outcome, decided, dry_run=dry_run)
     _write(os.path.join(args.out, "summary.md"), summary)
     print(summary)
+    # Whether there is a commit for the publish job to push. It is handed
+    # over as a git bundle of LOCAL_REF.
+    _set_outputs({"made": "true" if decided.get("push") else "false", "sha": (decided.get("push") or {}).get("sha", "")})
+    return 0
+
+
+def cmd_check_forward(args):
+    """Fail unless the plan's target is still ahead of what main pins now.
+
+    The bump commit was made from main as the run found it. Before it is
+    published, main is read again: if its pin has reached or passed the
+    target in the meantime, the bump would move main back, and the bot
+    never refreshes a bump branch, so it is refused here.
+    """
+    made = _json(args.plan) or {}
+    target = made.get("target") or {}
+    doc = _load_valid_pins(args.pins)
+    now = doc["release"]
+    if not target.get("version"):
+        return _fail(["the plan has no target, so there is nothing to publish"])
+    if versions.order(target["version"]) <= versions.order(now):
+        return _fail(
+            [
+                "main now pins OpenShell %s, which is not below the bump's target %s. main moved while "
+                "this run worked; nothing is published, and the next run plans again." % (now, target["version"])
+            ]
+        )
+    print("main pins OpenShell %s; the bump to %s still moves it forward" % (now, target["version"]))
     return 0
 
 
 def cmd_publish(args):
     decided = _json(args.plan)
+    if not isinstance(decided, dict):
+        return _fail(["%s is missing or empty: the bump step did not finish, so there is nothing to publish" % args.plan])
     dry_run = args.dry_run == "true"
     try:
         notes = publish_module.execute(decided, echo=_echo, dry_run=dry_run)
@@ -294,25 +307,26 @@ def build_parser():
     p.add_argument("--pins", default=DEFAULT_PINS)
     p.add_argument("--go-mod", default=DEFAULT_GO_MOD)
     p.add_argument("--dry-run", default="false", choices=flag)
+    p.add_argument("--version", default="", help="bump to this release (no leading v) instead of the newest stable one")
     p.add_argument("--summary", default="", help="also write the summary here")
     p.add_argument("--out", required=True)
 
-    p = add("next", cmd_next, "build what next should be and decide what to publish")
+    p = add("bump", cmd_bump, "make main plus the pin move and decide what to publish")
     p.add_argument("--plan", required=True)
-    p.add_argument("--repo", default=".", help="the clone to work in; it needs --main-ref and, if it exists, --next-ref")
+    p.add_argument("--repo", default=".", help="the clone to work in; it needs --main-ref and the remote's branches")
     p.add_argument("--tools", default=".", help="the checkout whose scripts are run: the one the workflow runs from")
     p.add_argument("--main-ref", default="HEAD")
-    p.add_argument("--next-ref", default=nextbranch.NEXT_REF)
-    p.add_argument("--open-prs", default="", help="`gh pr list --head next --state open --json ...` output")
-    p.add_argument("--merged-prs", default="", help="`gh pr list --head next --state merged --json ...` output")
-    p.add_argument("--has-bot-token", default="false", choices=flag)
-    p.add_argument("--automerge", default="false", choices=flag)
+    p.add_argument("--pulls", default="", help="`gh pr list --head <branch> --state all --json ...` output")
     p.add_argument("--repo-url", default="", help="https://host/owner/repo, so links work in a pull request")
     p.add_argument("--dry-run", default="false", choices=flag)
     p.add_argument("--out", required=True)
 
-    p = add("publish", cmd_publish, "push next and keep its pull request")
-    p.add_argument("--plan", required=True, help="the publish.json that `next` wrote")
+    p = add("check-forward", cmd_check_forward, "refuse a bump main has caught up with")
+    p.add_argument("--plan", required=True)
+    p.add_argument("--pins", default=DEFAULT_PINS, help="the pins of main as it is now")
+
+    p = add("publish", cmd_publish, "push the bump branch and open its pull request")
+    p.add_argument("--plan", required=True, help="the publish.json that `bump` wrote")
     p.add_argument("--dry-run", default="false", choices=flag)
     p.add_argument("--summary", default="", help="write notes for the run summary here")
 
@@ -344,7 +358,7 @@ def main(argv=None):
         upstream_module.UpstreamError,
         versions.VersionError,
         pinmove.PinMoveError,
-        nextbranch.GitError,
+        bump.GitError,
         publish_module.PublishError,
     ) as err:
         return _fail([str(err)])

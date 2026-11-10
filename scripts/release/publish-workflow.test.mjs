@@ -1,11 +1,11 @@
 // node --test "scripts/**/*.test.mjs"
 //
-// publish.yml runs for real only on main and on release branches, after a
-// merge. Two of its steps are shell written in the workflow file: the one that
-// decides WHETHER a run releases, and the one that hands the answer to
-// cut-release.mjs. These tests take those scripts out of the file and run
-// them, with a stand-in `gh` that answers the two questions the first one
-// asks GitHub (did CI pass for this commit, and which pull request merged it).
+// publish.yml runs only when a person starts it, on main or on a release
+// branch. Two of its steps are shell written in the workflow file: the one that
+// checks the run (dry run or not, and whether CI passed), and the one that
+// hands the answer to cut-release.mjs. These tests take those scripts out of
+// the file and run them, with a stand-in `gh` that answers the one question
+// the first one asks GitHub: did CI pass for this commit.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -60,18 +60,11 @@ const cleanEnv = () =>
     Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_') && !name.startsWith('GITHUB_')),
   );
 
-const fromNext = [
-  { merged_at: '2026-10-14T06:30:00Z', base: { ref: 'main' }, head: { ref: 'next', repo: { full_name: REPO } } },
-];
-const ordinary = [
-  { merged_at: '2026-10-14T06:30:00Z', base: { ref: 'main' }, head: { ref: 'fix/something', repo: { full_name: REPO } } },
-];
-
 /**
- * Runs the step that decides whether a run releases, in a checkout of one
- * commit, and returns what it wrote for the steps after it.
+ * Runs the step that checks the run, in a checkout of one commit, and returns
+ * what it wrote for the steps after it.
  */
-function decide(t, { event, branch = 'main', dryRun = '', greenRuns = 1, pulls = ordinary }) {
+function decide(t, { branch = 'main', dryRun = '', greenRuns = 1 }) {
   const dir = tempDir(t);
   const work = join(dir, 'work');
   const bin = join(dir, 'bin');
@@ -91,8 +84,6 @@ const args = process.argv.slice(2);
 appendFileSync(process.env.STUB_LOG, args.join(' ') + '\\n');
 if (args[0] === 'api' && args[1].includes('/actions/workflows/ci.yml/runs?')) {
   process.stdout.write(process.env.STUB_GREEN_RUNS + '\\n');
-} else if (args[0] === 'api' && /\\/commits\\/[0-9a-f]{40}\\/pulls$/.test(args[1])) {
-  process.stdout.write(process.env.STUB_PULLS);
 } else {
   process.stderr.write('unexpected gh call: ' + args.join(' ') + '\\n');
   process.exit(1);
@@ -120,7 +111,6 @@ if (args[0] === 'api' && args[1].includes('/actions/workflows/ci.yml/runs?')) {
     env: {
       ...env,
       PATH: `${bin}${delimiter}${process.env.PATH}`,
-      EVENT: event,
       BRANCH: branch,
       DRY_RUN: dryRun,
       REPO,
@@ -129,7 +119,6 @@ if (args[0] === 'api' && args[1].includes('/actions/workflows/ci.yml/runs?')) {
       GITHUB_STEP_SUMMARY: summary,
       STUB_LOG: ghLog,
       STUB_GREEN_RUNS: String(greenRuns),
-      STUB_PULLS: JSON.stringify(pulls),
     },
   });
   return {
@@ -149,7 +138,7 @@ if (args[0] === 'api' && args[1].includes('/actions/workflows/ci.yml/runs?')) {
 // --- nobody chooses the version ----------------------------------------------
 
 test('the workflow asks for a dry run or not, and for nothing else', () => {
-  const inputs = workflow.slice(workflow.indexOf('  workflow_dispatch:'), workflow.indexOf('  workflow_run:'));
+  const inputs = workflow.slice(workflow.indexOf('  workflow_dispatch:'), workflow.indexOf('\nconcurrency:'));
   assert.deepEqual(
     inputs.split('\n').filter((line) => /^ {6}[a-z_]+:$/.test(line)).map((line) => line.trim()),
     ['dry_run:'],
@@ -168,19 +157,29 @@ test('the workflow asks for a dry run or not, and for nothing else', () => {
 test('a person can start it on main or on a release branch, and nowhere else', () => {
   assert.ok(
     workflow.includes(
-      "(github.event_name == 'workflow_dispatch' &&\n" +
-        "       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))) ||",
+      "      github.event_name == 'workflow_dispatch' &&\n" +
+        "      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))\n",
     ),
   );
-  // The automatic path is still for a push to main in this repository only.
-  assert.ok(workflow.includes("github.event.workflow_run.head_branch == 'main' &&"));
-  assert.ok(workflow.includes('github.event.workflow_run.head_repository.full_name == github.repository)'));
+});
+
+// Nothing releases by itself: not a merge, not a CI run that finished, not the
+// move to a new OpenShell release.
+test('only a person starts it: workflow_dispatch is its one trigger', () => {
+  const on = workflow.slice(workflow.indexOf('\non:\n') + 1, workflow.indexOf('\nconcurrency:'));
+  assert.deepEqual(
+    on.split('\n').filter((line) => /^ {2}[a-z_]+:/.test(line)).map((line) => line.trim()),
+    ['workflow_dispatch:'],
+  );
+  for (const gone of ['workflow_run', 'next-merge', 'pull-requests:']) {
+    assert.ok(!workflow.includes(gone), `publish.yml still mentions ${gone}`);
+  }
 });
 
 // --- does this run release? --------------------------------------------------
 
 test('asked for by a person: a dry run by default, on the branch it was started on', { skip: !haveBash }, (t) => {
-  const run = decide(t, { event: 'workflow_dispatch', dryRun: 'true' });
+  const run = decide(t, { dryRun: 'true' });
   assert.equal(run.status, 0, run.stderr);
   assert.deepEqual(run.outputs, { release: 'true', dry_run: 'true', branch: 'main' });
   assert.equal(run.summary, 'Asked for by a person, on main (dry run).\n');
@@ -189,40 +188,22 @@ test('asked for by a person: a dry run by default, on the branch it was started 
     `api repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${run.sha}&event=push&status=success&per_page=1 --jq .total_count`,
   ]);
 
-  const real = decide(t, { event: 'workflow_dispatch', dryRun: 'false', branch: 'release/0.1' });
+  const real = decide(t, { dryRun: 'false', branch: 'release/0.1' });
   assert.equal(real.status, 0, real.stderr);
   assert.deepEqual(real.outputs, { release: 'true', dry_run: 'false', branch: 'release/0.1' });
   assert.equal(real.summary, 'Asked for by a person, on release/0.1.\n');
 });
 
 test('a release needs a commit whose CI passed; a dry run only warns', { skip: !haveBash }, (t) => {
-  const refused = decide(t, { event: 'workflow_dispatch', dryRun: 'false', greenRuns: 0 });
+  const refused = decide(t, { dryRun: 'false', greenRuns: 0 });
   assert.equal(refused.status, 1);
   assert.match(refused.stdout, /^::error::CI has not passed for [0-9a-f]{40}, so there is no tested image to release\./m);
   assert.deepEqual(refused.outputs, {}, 'nothing is handed to the steps after it');
 
-  const dry = decide(t, { event: 'workflow_dispatch', dryRun: 'true', greenRuns: 0 });
+  const dry = decide(t, { dryRun: 'true', greenRuns: 0 });
   assert.equal(dry.status, 0, dry.stderr);
   assert.match(dry.stdout, /^::warning::CI has not passed for [0-9a-f]{40}\. This dry run goes ahead/m);
   assert.deepEqual(dry.outputs, { release: 'true', dry_run: 'true', branch: 'main' });
-});
-
-test('CI finished on main: the merge of next is released, for real, and nothing else is', { skip: !haveBash }, (t) => {
-  const merged = decide(t, { event: 'workflow_run', pulls: fromNext });
-  assert.equal(merged.status, 0, merged.stderr);
-  assert.deepEqual(merged.outputs, { release: 'true', dry_run: 'false', branch: 'main' });
-  assert.equal(merged.summary, 'Merged from next, the move to a new OpenShell release: releasing it.\n');
-  assert.deepEqual(merged.gh, [`api repos/${REPO}/commits/${merged.sha}/pulls`]);
-
-  const other = decide(t, { event: 'workflow_run', pulls: ordinary });
-  assert.equal(other.status, 0, other.stderr);
-  assert.deepEqual(other.outputs, { release: 'false', dry_run: 'false', branch: 'main' });
-  assert.match(other.summary, /was not merged from next\. Nothing is released automatically/);
-
-  // A commit pushed straight to main, and a fork's branch that is named next.
-  assert.equal(decide(t, { event: 'workflow_run', pulls: [] }).outputs.release, 'false');
-  const fork = [{ ...fromNext[0], head: { ref: 'next', repo: { full_name: 'someone/openshell-dashboard' } } }];
-  assert.equal(decide(t, { event: 'workflow_run', pulls: fork }).outputs.release, 'false');
 });
 
 // A commit that is already released has its tag, and the step that asks the
