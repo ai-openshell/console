@@ -66,7 +66,7 @@ test('trades the GitHub OIDC token for a robot token and logs docker and helm in
 
 test('skips helm when it is not installed', (t) => {
   const { run, lines } = setup(t, { helm: false });
-  assert.equal(run(['ai-openshell+console_dev']).status, 0);
+  assert.equal(run(['ai-openshell+console_release']).status, 0);
   assert.equal(lines().filter((l) => l.startsWith('helm')).length, 0);
 });
 
