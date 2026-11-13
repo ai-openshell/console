@@ -317,17 +317,21 @@ jobs:
         run: deploy/ci/e2e-stack.sh down
 
   # Builds the image on every run. Only a push (to main or a release branch)
-  # publishes it, and only through the `release` environment, whose token is
-  # the one thing that can write to ghcr.io/ai-openshell/console. The
-  # environment admits main and release/** only, so a pull request, which
-  # runs with no environment here, cannot reach the token even if it edits
-  # this file. Pull request images are the `pr-image` job's, and go to
-  # console-dev.
+  # publishes it, and only from the `release` environment. No registry secret
+  # is stored anywhere: scripts/quay-login.sh trades the job's GitHub OIDC
+  # token for a one-hour token of the robot ai-openshell+console_release,
+  # which can write quay.io/ai-openshell/console and its chart and nothing
+  # else. Quay hands that token out only to the exact subject
+  # repo:ai-openshell/console:environment:release, and the environment admits
+  # main and release/** only, so a pull request cannot get it even if it edits
+  # this file: its subject is ...:pull_request, which no robot trusts.
+  # Pull request images are the `pr-image` job's, and go to console-dev.
   build:
     runs-on: ${{ matrix.runner }}
     environment: ${{ github.event_name == 'push' && 'release' || '' }}
     permissions:
       contents: read
+      id-token: write
     env:
       PUBLISH_IMAGE: ${{ github.event_name == 'push' }}
     strategy:
@@ -356,16 +360,15 @@ jobs:
           set -euo pipefail
           node scripts/gateway-range.mjs --format github | tee -a "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+      - name: Sign in to quay.io as the release robot
         if: env.PUBLISH_IMAGE == 'true'
-        with:
-          registry: ghcr.io
-          username: ${{ vars.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+        env:
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_release' }}
+        run: scripts/quay-login.sh "$QUAY_ROBOT"
       - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         id: meta
         with:
-          images: ghcr.io/ai-openshell/console
+          images: quay.io/ai-openshell/console
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         id: build
         with:
@@ -385,7 +388,7 @@ jobs:
           # Only a push writes the cache that a release is built from. A pull
           # request reads it and writes nothing back.
           cache-to: ${{ github.event_name == 'push' && format('type=gha,scope={0},mode=max', matrix.platform) || '' }}
-          outputs: ${{ env.PUBLISH_IMAGE == 'true' && 'type=image,name=ghcr.io/ai-openshell/console,push-by-digest=true,name-canonical=true,push=true' || '' }}
+          outputs: ${{ env.PUBLISH_IMAGE == 'true' && 'type=image,name=quay.io/ai-openshell/console,push-by-digest=true,name-canonical=true,push=true' || '' }}
       - name: Export digest
         if: env.PUBLISH_IMAGE == 'true'
         run: |
@@ -414,23 +417,24 @@ jobs:
     environment: release
     permissions:
       contents: read
+      id-token: write
     needs: [build]
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: /tmp/digests
           pattern: digest-*
           merge-multiple: true
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
-        with:
-          registry: ghcr.io
-          username: ${{ vars.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+      - name: Sign in to quay.io as the release robot
+        env:
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_release' }}
+        run: scripts/quay-login.sh "$QUAY_ROBOT"
       - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         id: meta
         with:
-          images: ghcr.io/ai-openshell/console
+          images: quay.io/ai-openshell/console
           # sha-<first 7 characters of the commit> is how every later tag finds
           # this image: promote-latest below, and the version tags publish.yml
           # adds when a release is cut. Keep the format in step with both.
@@ -441,7 +445,7 @@ jobs:
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/ai-openshell/console@sha256:%s ' *)
+            $(printf 'quay.io/ai-openshell/console@sha256:%s ' *)
 
   # Reads the image that push-manifest just pushed back from the registry and
   # checks that its labels declare the gateway release line and the SDK on both
@@ -458,22 +462,16 @@ jobs:
     needs: [push-manifest]
     permissions:
       contents: read
-      packages: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-      # Reading only. The workflow's own token keeps read access to the
-      # package; a private package needs it.
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      # Reading only, and anonymously: the repository is public, so this job
+      # holds no registry credential.
       - name: The pushed image declares its gateway release line
-        run: node scripts/check-image-range.mjs "ghcr.io/ai-openshell/console:sha-${GITHUB_SHA::7}"
+        run: node scripts/check-image-range.mjs "quay.io/ai-openshell/console:sha-${GITHUB_SHA::7}"
 
   # `latest` only moves to a commit that passed everything, and only forward.
   #
@@ -504,6 +502,7 @@ jobs:
     environment: release
     permissions:
       contents: read
+      id-token: write
     needs:
       [
         push-manifest,
@@ -526,15 +525,14 @@ jobs:
           scripts/branch-tip.sh origin main "$GITHUB_SHA" | tee -a "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
         if: steps.tip.outputs.is_tip == 'true'
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+      - name: Sign in to quay.io as the release robot
         if: steps.tip.outputs.is_tip == 'true'
-        with:
-          registry: ghcr.io
-          username: ${{ vars.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+        env:
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_release' }}
+        run: scripts/quay-login.sh "$QUAY_ROBOT"
       - name: Point latest at this commit's image
         if: steps.tip.outputs.is_tip == 'true'
-        run: scripts/retag-image.sh ghcr.io/ai-openshell/console "sha-${GITHUB_SHA::7}" latest
+        run: scripts/retag-image.sh quay.io/ai-openshell/console "sha-${GITHUB_SHA::7}" latest
 
   # Dev charts are deliberately floating. Stable chart versions are published
   # only from publish.yml after the versioned container image has been tagged.
@@ -545,6 +543,7 @@ jobs:
     environment: release
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
@@ -558,30 +557,32 @@ jobs:
       - name: Publish floating development chart
         if: steps.tip.outputs.is_tip == 'true'
         env:
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          GHCR_USERNAME: ${{ vars.GHCR_USERNAME || github.actor }}
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_release' }}
         run: |
           set -euo pipefail
-          helm registry login ghcr.io -u "$GHCR_USERNAME" --password-stdin <<< "$GHCR_TOKEN"
+          scripts/quay-login.sh "$QUAY_ROBOT"
           helm package deploy/helm/openshell-dashboard --version 0.0.0-dev \
             --app-version "sha-${GITHUB_SHA::7}" --destination "$RUNNER_TEMP"
           helm push "$RUNNER_TEMP/openshell-dashboard-0.0.0-dev.tgz" \
-            "oci://ghcr.io/${GITHUB_REPOSITORY,,}/helm-chart"
+            "oci://quay.io/${GITHUB_REPOSITORY,,}/helm-chart"
 
-  # An image of a pull request, to try on a cluster: ghcr.io/ai-openshell/
+  # An image of a pull request, to try on a cluster: quay.io/ai-openshell/
   # console-dev:pr-<n> (and :sha-<7>), linux/amd64. It waits until a
-  # maintainer approves the run in the `pr-images` environment, whose token can
-  # write to console-dev and nothing else; the public image is out of its
-  # reach. A plain pull_request run on purpose, never pull_request_target: that
-  # would run with main's cache scope, so a pull request could plant layers
-  # that main's build, and so a release, reuses. Here the cache is only read.
-  # A fork's pull request gets no image: GitHub hands it no environment secret.
+  # maintainer approves the run in the `pr-images` environment. Its robot,
+  # ai-openshell+console_dev, trusts the subject
+  # repo:ai-openshell/console:environment:pr-images and can write console-dev
+  # and nothing else; the public image is out of its reach. A plain
+  # pull_request run on purpose, never pull_request_target: that would run
+  # with main's cache scope, so a pull request could plant layers that main's
+  # build, and so a release, reuses. Here the cache is only read. A fork's pull
+  # request gets no image: GitHub gives it no OIDC token to trade.
   pr-image:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     environment: pr-images
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -593,15 +594,14 @@ jobs:
           set -euo pipefail
           node scripts/gateway-range.mjs --format github | tee -a "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
-        with:
-          registry: ghcr.io
-          username: ${{ vars.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+      - name: Sign in to quay.io as the console-dev robot
+        env:
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_dev' }}
+        run: scripts/quay-login.sh "$QUAY_ROBOT"
       - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         id: meta
         with:
-          images: ghcr.io/ai-openshell/console-dev
+          images: quay.io/ai-openshell/console-dev
           tags: |
             type=ref,event=pr,prefix=pr-
             type=sha,prefix=sha-,format=short

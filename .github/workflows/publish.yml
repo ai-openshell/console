@@ -165,9 +165,10 @@ jobs:
   # A separate job so that the package permission is never in the job that
   # holds the repository permissions, and so that a registry hiccup can
   # be retried on its own ("Re-run failed jobs") without touching the release.
-  # Both jobs below write packages, so both run in the `release` environment,
-  # which admits main and release/** only and holds the one token that can
-  # write to the console image and its chart.
+  # Both jobs below write to quay.io, so both run in the `release` environment,
+  # which admits main and release/** only. Only a job in it can trade its
+  # GitHub OIDC token for the release robot's (scripts/quay-login.sh), the one
+  # robot that can write the console image and its chart.
   tag-image:
     needs: publish
     if: needs.publish.outputs.version != ''
@@ -175,17 +176,17 @@ jobs:
     environment: release
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ needs.publish.outputs.sha }}
           persist-credentials: false
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ vars.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+      - name: Sign in to quay.io as the release robot
+        env:
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_release' }}
+        run: scripts/quay-login.sh "$QUAY_ROBOT"
       - name: Tag the image built for this commit with the release version
         env:
           SOURCE_TAG: ${{ needs.publish.outputs.source_tag }}
@@ -193,7 +194,7 @@ jobs:
         run: |
           set -euo pipefail
           read -r -a tags <<< "$IMAGE_TAGS"
-          scripts/retag-image.sh ghcr.io/ai-openshell/console "$SOURCE_TAG" "${tags[@]}"
+          scripts/retag-image.sh quay.io/ai-openshell/console "$SOURCE_TAG" "${tags[@]}"
 
   # Packaged from this commit with the image tag that tag-image just published.
   # Never re-push a stable OCI version; an existing version is left unchanged.
@@ -204,6 +205,7 @@ jobs:
     environment: release
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -214,13 +216,12 @@ jobs:
           version: v3.17.3
       - name: Publish immutable versioned chart
         env:
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          GHCR_USERNAME: ${{ vars.GHCR_USERNAME || github.actor }}
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_release' }}
           VERSION: ${{ needs.publish.outputs.version }}
         run: |
           set -euo pipefail
-          echo "$GHCR_TOKEN" | helm registry login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-          registry="oci://ghcr.io/${GITHUB_REPOSITORY,,}/helm-chart"
+          scripts/quay-login.sh "$QUAY_ROBOT"
+          registry="oci://quay.io/${GITHUB_REPOSITORY,,}/helm-chart"
           ref="$registry/openshell-dashboard"
           if helm show chart "$ref" --version "$VERSION" > "$RUNNER_TEMP/chart-lookup.log" 2>&1; then
             echo "Chart $ref:$VERSION already exists; leaving immutable version untouched."
