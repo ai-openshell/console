@@ -115,7 +115,7 @@ networkPolicy:
 
 ```sh
 helm upgrade --install openshell-dashboard \
-  oci://ghcr.io/ai-openshell/console/helm-chart/openshell-dashboard \
+  oci://quay.io/ai-openshell/console/helm-chart/openshell-dashboard \
   --version <dashboard version> --namespace openshell -f values.yaml
 ```
 

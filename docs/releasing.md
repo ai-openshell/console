@@ -9,25 +9,36 @@ A release `vX.Y.Z` is three things, all made by `publish.yml`:
 | Artifact | Where | Made by |
 |---|---|---|
 | GitHub release `vX.Y.Z`, and the git tag with it | this repository | `scripts/release/cut-release.mjs` |
-| Container image tags `X.Y.Z` and `X.Y` | `ghcr.io/ai-openshell/console` | retagging the image CI already built |
-| Helm chart `openshell-dashboard`, version `X.Y.Z` | `oci://ghcr.io/ai-openshell/console/helm-chart` | packaging the chart at the released commit |
+| Container image tags `X.Y.Z` and `X.Y` | `quay.io/ai-openshell/console` | retagging the image CI already built |
+| Helm chart `openshell-dashboard`, version `X.Y.Z` | `oci://quay.io/ai-openshell/console/helm-chart` | packaging the chart at the released commit |
 
-The chart's registry path follows the repository's name (`publish.yml` pushes to `oci://ghcr.io/<owner>/<repository>/helm-chart`), so a package created under a new name starts out private: make it public in the organization's package settings before announcing the release. Releases up to `0.1.2` are at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart`, the path before the repository moved to `ai-openshell/console`; nothing is published there any more. The image moved the same way: releases up to `0.1.3` are at `quay.io/gkrumbach07/openshell-dashboard`, and CI pushes every newer image to `ghcr.io/ai-openshell/console`. That package also starts out private.
+The chart's registry path follows the repository's name (`publish.yml` pushes to `oci://quay.io/<owner>/<repository>/helm-chart`), so the chart lands in the Quay repository `console/helm-chart/openshell-dashboard`, next to the image's `console`. It is a repository of its own, with its own visibility and permissions: a chart cannot share the image's repository, because chart version `X.Y.Z` and image tag `X.Y.Z` would be the same tag. Renaming or transferring this repository moves the chart path with it.
 
-## Who can write the packages
+Earlier homes, which receive no new release: images up to `0.1.3` are at `quay.io/gkrumbach07/openshell-dashboard`, and charts up to `0.1.2` at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart`. Between the move to `ai-openshell/console` and the move to Quay, CI pushed development images to `ghcr.io/ai-openshell/console`, which was never made public.
 
-The workflow's own token cannot write any package: no job asks for `packages: write`. Two environments, kept by the organization's infra team, each hold a token named `GHCR_TOKEN` that can write to one thing:
+## Who can write to quay.io
 
-| Environment | Who may use it | Its token writes to | Used by |
-|---|---|---|---|
-| `release` | `main` and `release/**` only | `ghcr.io/ai-openshell/console` and its Helm chart | `ci.yml` on a push (`build`, `push-manifest`, `promote-latest`, `publish-dev-chart`) and `publish.yml` (`tag-image`, `publish-chart`) |
-| `pr-images` | a run a maintainer approved | `ghcr.io/ai-openshell/console-dev` only | `ci.yml`'s `pr-image` job |
+No registry secret is stored anywhere, and the workflow's own token cannot write any registry (no job asks for `packages: write`). A job that publishes runs `scripts/quay-login.sh`, which asks GitHub for the job's OIDC token and trades it at Quay's robot federation endpoint (`https://quay.io/oauth2/federation/robot/token`) for a robot token that lasts one hour. Quay gives a robot's token only to a GitHub token whose issuer and subject the robot trusts, compared exactly, and each robot trusts one GitHub environment:
 
-A pull request never publishes to `console`, even one that edits a workflow: it runs with no environment. It does not write the build cache that `main`'s build, and so a release, reads.
+| Environment | Who may use it | Robot, and the subject it trusts | It can write | Used by |
+|---|---|---|---|---|
+| `release` | `main` and `release/**` only | `ai-openshell+console_release`, `repo:ai-openshell/console:environment:release` | `console` and `console/helm-chart/openshell-dashboard` | `ci.yml` on a push (`build`, `push-manifest`, `promote-latest`, `publish-dev-chart`) and `publish.yml` (`tag-image`, `publish-chart`) |
+| `pr-images` | a run a maintainer approved | `ai-openshell+console_dev`, `repo:ai-openshell/console:environment:pr-images` | `console-dev` only | `ci.yml`'s `pr-image` job |
 
-**An image of a pull request.** The `pr-image` job waits on every pull request from a branch of this repository. When a maintainer approves it (*Review deployments* on the pull request's checks), it builds `ghcr.io/ai-openshell/console-dev:pr-<n>` and `:sha-<7>` for linux/amd64. Each new push waits for approval again. A fork's pull request gets no image. The job runs on `pull_request`, never `pull_request_target`, so it cannot share `main`'s cache.
+The environment is what makes the subject mean something: GitHub puts `environment:release` in the token only for a job the environment admitted, so its deployment branches must stay `main` and `release/**`, and `pr-images` must keep its required reviewers. A variable `QUAY_ROBOT` on an environment overrides the robot's name.
 
-Every action in `ci.yml`, `publish.yml` and `follow-upstream.yml` is pinned by commit SHA, because those jobs hold these tokens.
+A pull request never publishes to `console`, even one that edits a workflow: it runs with no environment, so its token's subject is `repo:ai-openshell/console:pull_request`, which no robot trusts. It does not write the build cache that `main`'s build, and so a release, reads. `image-range` reads the pushed image anonymously, so the Quay repositories must be public.
+
+**An image of a pull request.** The `pr-image` job waits on every pull request from a branch of this repository. When a maintainer approves it (*Review deployments* on the pull request's checks), it builds `quay.io/ai-openshell/console-dev:pr-<n>` and `:sha-<7>` for linux/amd64. Each new push waits for approval again. A fork's pull request gets no image: GitHub gives it no OIDC token. The job runs on `pull_request`, never `pull_request_target`, so it cannot share `main`'s cache.
+
+**Setting it up on quay.io** (an owner of the `ai-openshell` organization):
+
+1. Create the public repositories `console`, `console-dev` and `console/helm-chart/openshell-dashboard`.
+2. Create the robots `console_release` (write on `console` and the chart) and `console_dev` (write on `console-dev`), and nothing else: leave the organization's default permissions empty.
+3. On each robot, *Set robot federation* with the issuer `https://token.actions.githubusercontent.com` and the subject in the table above.
+4. Optionally, an immutability policy on `console` for the tags `^[0-9]+\.[0-9]+\.[0-9]+$` and `^sha-`, so a release or a build cannot be overwritten. `latest` and `X.Y` are meant to move.
+
+Every action in `ci.yml`, `publish.yml` and `follow-upstream.yml` is pinned by commit SHA, because those jobs can publish.
 
 The BFF and the UI ship together and share the version.
 

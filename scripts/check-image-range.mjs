@@ -3,7 +3,7 @@
 // line it is for and the SDK it was built against, on every platform it was
 // built for.
 //
-//   node scripts/check-image-range.mjs ghcr.io/ai-openshell/console:sha-0a1b2c3
+//   node scripts/check-image-range.mjs quay.io/ai-openshell/console:sha-0a1b2c3
 //
 // Both reach the image as build args: ci.yml passes them, and deploy/Dockerfile
 // turns them into two labels. A build arg that is misspelt on either side is

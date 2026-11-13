@@ -710,8 +710,18 @@ def job_environment(lines):
     return None
 
 
+def code(lines):
+    """A job's lines without its comments (the comment above a job is read as the previous job's)."""
+    return "\n".join(line for line in lines if not line.lstrip().startswith("#"))
+
+
 class Publishing(unittest.TestCase):
-    """Packages are written only with an environment's token, never with the workflow's own."""
+    """quay.io is written only by a robot whose token a job earns from its environment.
+
+    No registry secret is stored: scripts/quay-login.sh trades the job's GitHub
+    OIDC token for a one-hour robot token, and each robot trusts exactly one
+    environment's subject (docs/releasing.md).
+    """
 
     ALL = [("ci.yml", name, lines) for name, lines in CI_ALL_JOBS.items()] + [
         ("publish.yml", name, lines) for name, lines in jobs(PUBLISH).items()
@@ -721,23 +731,45 @@ class Publishing(unittest.TestCase):
         for workflow, name, lines in self.ALL:
             self.assertNotEqual((permissions(lines) or {}).get("packages"), "write", "%s %s" % (workflow, name))
 
-    def test_every_job_that_holds_the_registry_token_is_in_an_environment(self):
-        holders = {}
+    def test_no_registry_secret_is_read_and_no_registry_is_logged_in_to_another_way(self):
+        for text in (CI, PUBLISH):
+            self.assertNotIn("GHCR_", text)
+            self.assertNotIn("docker/login-action", text)
+            self.assertNotIn("ghcr.io/ai-openshell", text)
+
+    def test_every_job_that_signs_in_is_in_an_environment_as_its_robot(self):
+        signers = {}
         for workflow, name, lines in self.ALL:
-            if "secrets.GHCR_TOKEN" in "\n".join(lines):
-                holders["%s %s" % (workflow, name)] = job_environment(lines)
+            text = code(lines)
+            if "scripts/quay-login.sh" in text:
+                robot = re.search(r"QUAY_ROBOT: \$\{\{ vars\.QUAY_ROBOT \|\| '([^']+)' \}\}", text)
+                self.assertIsNotNone(robot, "%s %s names no robot" % (workflow, name))
+                self.assertEqual(len(set(re.findall(r"vars\.QUAY_ROBOT \|\| '([^']+)'", text))), 1, name)
+                signers["%s %s" % (workflow, name)] = (job_environment(lines), robot.group(1))
+        release = ("release", "ai-openshell+console_release")
         self.assertEqual(
-            holders,
+            signers,
             {
-                "ci.yml build": "${{ github.event_name == 'push' && 'release' || '' }}",
-                "ci.yml push-manifest": "release",
-                "ci.yml promote-latest": "release",
-                "ci.yml publish-dev-chart": "release",
-                "ci.yml pr-image": "pr-images",
-                "publish.yml tag-image": "release",
-                "publish.yml publish-chart": "release",
+                "ci.yml build": ("${{ github.event_name == 'push' && 'release' || '' }}", "ai-openshell+console_release"),
+                "ci.yml push-manifest": release,
+                "ci.yml promote-latest": release,
+                "ci.yml publish-dev-chart": release,
+                "ci.yml pr-image": ("pr-images", "ai-openshell+console_dev"),
+                "publish.yml tag-image": release,
+                "publish.yml publish-chart": release,
             },
         )
+
+    def test_only_the_jobs_that_sign_in_can_ask_for_an_oidc_token(self):
+        for workflow, name, lines in self.ALL:
+            asks = (permissions(lines) or {}).get("id-token") == "write"
+            signs = "scripts/quay-login.sh" in code(lines)
+            self.assertEqual(asks, signs, "%s %s" % (workflow, name))
+
+    def test_the_build_signs_in_only_on_a_push(self):
+        login = [s for s in steps(CI_ALL_JOBS["build"]) if "scripts/quay-login.sh" in "\n".join(s["lines"])]
+        self.assertEqual(len(login), 1)
+        self.assertIn("        if: env.PUBLISH_IMAGE == 'true'", login[0]["lines"])
 
     def test_a_pull_request_writes_no_cache_a_release_reads(self):
         build = "\n".join(CI_ALL_JOBS["build"])
@@ -752,8 +784,8 @@ class Publishing(unittest.TestCase):
             job,
         )
         self.assertIn("    environment: pr-images", job)
-        self.assertIn("images: ghcr.io/ai-openshell/console-dev", text)
-        self.assertNotIn("ghcr.io/ai-openshell/console\n", text + "\n")
+        self.assertIn("images: quay.io/ai-openshell/console-dev", text)
+        self.assertNotIn("quay.io/ai-openshell/console\n", text + "\n")
         code = "\n".join(line for line in CI.splitlines() if not line.lstrip().startswith("#"))
         self.assertNotIn("pull_request_target", code)
 
