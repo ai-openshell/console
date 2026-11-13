@@ -9,10 +9,35 @@ A release `vX.Y.Z` is three things, all made by `publish.yml`:
 | Artifact | Where | Made by |
 |---|---|---|
 | GitHub release `vX.Y.Z`, and the git tag with it | this repository | `scripts/release/cut-release.mjs` |
-| Container image tags `X.Y.Z` and `X.Y` | `ghcr.io/ai-openshell/console` | retagging the image CI already built |
-| Helm chart `openshell-dashboard`, version `X.Y.Z` | `oci://ghcr.io/ai-openshell/console/helm-chart` | packaging the chart at the released commit |
+| Container image tags `X.Y.Z` and `X.Y` | `quay.io/ai-openshell/console` | retagging the image CI already built |
+| Helm chart `openshell-dashboard`, version `X.Y.Z` | `oci://quay.io/ai-openshell/console/helm-chart` | packaging the chart at the released commit |
 
-The chart's registry path follows the repository's name (`publish.yml` pushes to `oci://ghcr.io/<owner>/<repository>/helm-chart`), so a package created under a new name starts out private: make it public in the organization's package settings before announcing the release. Releases up to `0.1.2` are at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart`, the path before the repository moved to `ai-openshell/console`; nothing is published there any more. The image moved the same way: releases up to `0.1.3` are at `quay.io/gkrumbach07/openshell-dashboard`, and CI pushes every newer image to `ghcr.io/ai-openshell/console` with the workflow's own token, so no registry secret is needed. That package also starts out private.
+The chart's registry path follows the repository's name (`publish.yml` pushes to `oci://quay.io/<owner>/<repository>/helm-chart`), so the chart lands in the Quay repository `console/helm-chart/openshell-dashboard`, next to the image's `console`. It is a repository of its own, with its own visibility and permissions: a chart cannot share the image's repository, because chart version `X.Y.Z` and image tag `X.Y.Z` would be the same tag. Renaming or transferring this repository moves the chart path with it.
+
+Earlier homes, which receive no new release: images up to `0.1.3` are at `quay.io/gkrumbach07/openshell-dashboard`, and charts up to `0.1.2` at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart`. Between the move to `ai-openshell/console` and the move to Quay, CI pushed development images to `ghcr.io/ai-openshell/console`, which was never made public.
+
+## Who can write to quay.io
+
+No registry secret is stored anywhere, and the workflow's own token cannot write any registry (no job asks for `packages: write`). A job that publishes runs `scripts/quay-login.sh`, which asks GitHub for the job's OIDC token and trades it at Quay's robot federation endpoint (`https://quay.io/oauth2/federation/robot/token`) for a robot token that lasts one hour. Quay gives a robot's token only to a GitHub token whose issuer and subject the robot trusts, compared exactly. There is one robot, and it trusts one GitHub environment:
+
+| Environment | Who may use it | Robot, and the subject it trusts | It can write | Used by |
+|---|---|---|---|---|
+| `release` | `main` and `release/**` only | `ai-openshell+console_release`, `repo:ai-openshell/console:environment:release` | `console` and `console/helm-chart/openshell-dashboard` | `ci.yml` on a push (`build`, `push-manifest`, `promote-latest`, `publish-dev-chart`) and `publish.yml` (`tag-image`, `publish-chart`) |
+
+The environment is what makes the subject mean something: GitHub puts `environment:release` in the token only for a job the environment admitted, so its deployment branches must stay `main` and `release/**`. A variable `QUAY_ROBOT` on an environment overrides the robot's name.
+
+A pull request never publishes to `console`, even one that edits a workflow: it runs with no environment, so its token's subject is `repo:ai-openshell/console:pull_request`, which no robot trusts. It does not write the build cache that `main`'s build, and so a release, reads. `image-range` reads the pushed image anonymously, so the Quay repositories must be public.
+
+**A pull request gets no image.** It is built on both platforms, to prove that it builds, and then discarded. To try a change on a cluster, build the image locally (`make build`) and push it to a registry of your own.
+
+**Setting it up on quay.io** (an owner of the `ai-openshell` organization):
+
+1. Create the public repositories `console` and `console/helm-chart/openshell-dashboard`.
+2. Create the robot `console_release` with write on `console` and the chart and nothing else, and leave the organization's default permissions empty.
+3. On the robot, *Set robot federation* with the issuer `https://token.actions.githubusercontent.com` and the subject in the table above.
+4. Optionally, an immutability policy on `console` for the tags `^[0-9]+\.[0-9]+\.[0-9]+$` and `^sha-`, so a release or a build cannot be overwritten. `latest` and `X.Y` are meant to move.
+
+Every action in `ci.yml`, `publish.yml` and `follow-upstream.yml` is pinned by commit SHA, because those jobs can publish.
 
 The BFF and the UI ship together and share the version.
 
@@ -112,7 +137,7 @@ publish.yml   started by a person, on main or release/X.Y
 ```
 
 - **The image is built once.** `scripts/retag-image.sh` adds `latest`, `X.Y.Z` and `X.Y` later, by pointing the tag at the digest of `sha-<7>`, so a released image is byte for byte the one CI built for the commit that passed.
-- **`latest` waits for everything.** `sha-<7>` and `pr-<n>` are pushed when the build finishes. `latest` moves after every job in `ci.yml` has passed on `main`.
+- **`latest` waits for everything.** `sha-<7>` is pushed when the build of a push finishes. `latest` moves after every job in `ci.yml` has passed on `main`.
 - **`latest` only moves forward, and no release moves it.** A run can be re-run for thirty days and keeps its commit, so `promote-latest` first checks that the commit is still the tip of `main` (`scripts/branch-tip.sh`), and otherwise succeeds without touching the registry.
 - **A version is written once.** `retag-image.sh` refuses to point an existing `X.Y.Z` at another digest, and `publish-chart` leaves an existing chart version untouched. `X.Y`, `latest` and the development chart `0.0.0-dev` are meant to move.
 

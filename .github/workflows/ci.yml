@@ -23,11 +23,11 @@ jobs:
   helm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: v3.17.3
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "1.25.1"
       - name: Render and lint all chart overlays
@@ -38,7 +38,7 @@ jobs:
         run: |
           helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3
           make helm-test
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
       - name: Generated chart README is current
         run: |
           make helm-docs
@@ -50,15 +50,15 @@ jobs:
   check-frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         id: filter
         with:
           filters: |
             frontend:
               - 'frontend/**'
               - 'package*.json'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         if: steps.filter.outputs.frontend == 'true' || github.event_name == 'push'
         with:
           node-version: "22"
@@ -78,20 +78,20 @@ jobs:
   check-backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         id: filter
         with:
           filters: |
             backend:
               - 'backend/**'
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         if: steps.filter.outputs.backend == 'true' || github.event_name == 'push'
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
       - if: steps.filter.outputs.backend == 'true' || github.event_name == 'push'
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           working-directory: backend
           version: v2.12.2
@@ -101,8 +101,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
           cache: "npm"
@@ -124,14 +124,14 @@ jobs:
           echo "The dev server did not answer on :3000 within 60 s."
           cat "$RUNNER_TEMP/vite.log"
           exit 1
-      - uses: cypress-io/github-action@v6
+      - uses: cypress-io/github-action@f790eee7a50d9505912f50c2095510be7de06aa7 # v6.10.9
         with:
           working-directory: frontend
           install: false
           browser: chrome
       - if: failure()
         run: cat "$RUNNER_TEMP/vite.log" || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: cypress-screenshots
@@ -169,7 +169,7 @@ jobs:
       config_schema: ${{ steps.read.outputs.config_schema }}
       sandbox_image: ${{ steps.read.outputs.sandbox_image }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # The validator below and the Follow upstream workflow share this code.
       # A few seconds of unit tests here keep both honest on every PR.
       - name: Unit-test the pins and upstream logic
@@ -199,7 +199,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: The pins name a stable OpenShell release, not a pre-release
         run: python3 deploy/ci/upstream/follow.py require-stable deploy/ci/gateway-pins.json
 
@@ -259,7 +259,7 @@ jobs:
       # changed.
       COMPAT_EXPECT_COMPATIBILITY: supported
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Pull images
         run: |
@@ -282,7 +282,7 @@ jobs:
           export OPENSHELL_GRPC_ENDPOINT="http://${BRIDGE}:8080"
           deploy/ci/e2e-stack.sh up
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
@@ -316,13 +316,24 @@ jobs:
         if: always()
         run: deploy/ci/e2e-stack.sh down
 
+  # Builds the image on every run. Only a push (to main or a release branch)
+  # publishes it, and only from the `release` environment. No registry secret
+  # is stored anywhere: scripts/quay-login.sh trades the job's GitHub OIDC
+  # token for a one-hour token of the robot ai-openshell+console_release,
+  # which can write quay.io/ai-openshell/console and its chart and nothing
+  # else. Quay hands that token out only to the exact subject
+  # repo:ai-openshell/console:environment:release, and the environment admits
+  # main and release/** only, so a pull request cannot get it even if it edits
+  # this file: its subject is ...:pull_request, which no robot trusts. A pull
+  # request gets no image.
   build:
     runs-on: ${{ matrix.runner }}
+    environment: ${{ github.event_name == 'push' && 'release' || '' }}
     permissions:
       contents: read
-      packages: write
+      id-token: write
     env:
-      PUBLISH_IMAGE: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+      PUBLISH_IMAGE: ${{ github.event_name == 'push' }}
     strategy:
       matrix:
         include:
@@ -331,8 +342,8 @@ jobs:
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       # The image states which gateway release line it is for, and the SDK it
@@ -348,18 +359,17 @@ jobs:
           # pipefail, or a failing derivation would hide behind tee's exit 0.
           set -euo pipefail
           node scripts/gateway-range.mjs --format github | tee -a "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - name: Sign in to quay.io as the release robot
         if: env.PUBLISH_IMAGE == 'true'
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
+        env:
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_release' }}
+        run: scripts/quay-login.sh "$QUAY_ROBOT"
+      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         id: meta
         with:
-          images: ghcr.io/ai-openshell/console
-      - uses: docker/build-push-action@v6
+          images: quay.io/ai-openshell/console
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         id: build
         with:
           context: .
@@ -375,15 +385,17 @@ jobs:
             OPENSHELL_SDK_VERSION=${{ steps.gateway.outputs.sdk }}
             DASHBOARD_COMMIT=${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.platform }}
-          cache-to: type=gha,scope=${{ matrix.platform }},mode=max
-          outputs: ${{ env.PUBLISH_IMAGE == 'true' && 'type=image,name=ghcr.io/ai-openshell/console,push-by-digest=true,name-canonical=true,push=true' || '' }}
+          # Only a push writes the cache that a release is built from. A pull
+          # request reads it and writes nothing back.
+          cache-to: ${{ github.event_name == 'push' && format('type=gha,scope={0},mode=max', matrix.platform) || '' }}
+          outputs: ${{ env.PUBLISH_IMAGE == 'true' && 'type=image,name=quay.io/ai-openshell/console,push-by-digest=true,name-canonical=true,push=true' || '' }}
       - name: Export digest
         if: env.PUBLISH_IMAGE == 'true'
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: env.PUBLISH_IMAGE == 'true'
         with:
           name: digest-${{ matrix.runner }}
@@ -392,50 +404,48 @@ jobs:
           retention-days: 1
 
   # Joins the two per-platform images into one multi-arch image and tags it with
-  # the commit (and the PR number, on a pull request). It needs only `build`,
-  # deliberately: these tags say "this is what that commit built", which is true
-  # whether or not the commit is any good, and they are how a pull request gets
-  # an image to try before its checks finish.
+  # the commit. It needs only `build`, deliberately: the tag says "this is what
+  # that commit built", which is true whether or not the commit is any good.
   #
   # It does NOT tag `latest`. That tag is a recommendation. Moved here, on
   # every push to main with only `build` to wait for, it could point at a
   # commit whose compat job had failed. `promote-latest` below moves it, once
   # everything has passed.
   push-manifest:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: read
-      packages: write
+      id-token: write
     needs: [build]
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: /tmp/digests
           pattern: digest-*
           merge-multiple: true
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - name: Sign in to quay.io as the release robot
+        env:
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_release' }}
+        run: scripts/quay-login.sh "$QUAY_ROBOT"
+      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         id: meta
         with:
-          images: ghcr.io/ai-openshell/console
+          images: quay.io/ai-openshell/console
           # sha-<first 7 characters of the commit> is how every later tag finds
           # this image: promote-latest below, and the version tags publish.yml
           # adds when a release is cut. Keep the format in step with both.
           tags: |
             type=sha,prefix=sha-,format=short
-            type=ref,event=pr,prefix=pr-
       - name: Create and push multi-arch manifest
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/ai-openshell/console@sha256:%s ' *)
+            $(printf 'quay.io/ai-openshell/console@sha256:%s ' *)
 
   # Reads the image that push-manifest just pushed back from the registry and
   # checks that its labels declare the gateway release line and the SDK on both
@@ -447,27 +457,21 @@ jobs:
   # is published with empty labels. This inspects the image config; it does not
   # pull or run the image.
   image-range:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: [push-manifest]
     permissions:
       contents: read
-      packages: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
-      - uses: docker/setup-buildx-action@v3
-      # A new GHCR package is private until an org admin makes it public, and
-      # reading a private image needs a login.
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      # Reading only, and anonymously: the repository is public, so this job
+      # holds no registry credential.
       - name: The pushed image declares its gateway release line
-        run: node scripts/check-image-range.mjs "ghcr.io/ai-openshell/console:sha-${GITHUB_SHA::7}"
+        run: node scripts/check-image-range.mjs "quay.io/ai-openshell/console:sha-${GITHUB_SHA::7}"
 
   # `latest` only moves to a commit that passed everything, and only forward.
   #
@@ -495,9 +499,10 @@ jobs:
   promote-latest:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: read
-      packages: write
+      id-token: write
     needs:
       [
         push-manifest,
@@ -511,24 +516,23 @@ jobs:
         release-tooling,
       ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Is this commit still the tip of main?
         id: tip
         run: |
           # pipefail, or a failing check would hide behind tee's exit 0.
           set -euo pipefail
           scripts/branch-tip.sh origin main "$GITHUB_SHA" | tee -a "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
         if: steps.tip.outputs.is_tip == 'true'
-      - uses: docker/login-action@v3
+      - name: Sign in to quay.io as the release robot
         if: steps.tip.outputs.is_tip == 'true'
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_release' }}
+        run: scripts/quay-login.sh "$QUAY_ROBOT"
       - name: Point latest at this commit's image
         if: steps.tip.outputs.is_tip == 'true'
-        run: scripts/retag-image.sh ghcr.io/ai-openshell/console "sha-${GITHUB_SHA::7}" latest
+        run: scripts/retag-image.sh quay.io/ai-openshell/console "sha-${GITHUB_SHA::7}" latest
 
   # Dev charts are deliberately floating. Stable chart versions are published
   # only from publish.yml after the versioned container image has been tagged.
@@ -536,12 +540,13 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [promote-latest]
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: read
-      packages: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: v3.17.3
       - name: Is this commit still the tip of main?
@@ -552,14 +557,14 @@ jobs:
       - name: Publish floating development chart
         if: steps.tip.outputs.is_tip == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_release' }}
         run: |
           set -euo pipefail
-          helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin <<< "$GH_TOKEN"
+          scripts/quay-login.sh "$QUAY_ROBOT"
           helm package deploy/helm/openshell-dashboard --version 0.0.0-dev \
             --app-version "sha-${GITHUB_SHA::7}" --destination "$RUNNER_TEMP"
           helm push "$RUNNER_TEMP/openshell-dashboard-0.0.0-dev.tgz" \
-            "oci://ghcr.io/${GITHUB_REPOSITORY,,}/helm-chart"
+            "oci://quay.io/${GITHUB_REPOSITORY,,}/helm-chart"
 
   # The release pipeline (publish.yml, scripts/release/) runs for real only on
   # main and on release branches, after a merge. This job is where a mistake in
@@ -580,8 +585,8 @@ jobs:
   release-tooling:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       - name: The built-in gateway release line and the SDK pin match the pins

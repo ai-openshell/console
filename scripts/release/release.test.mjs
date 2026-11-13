@@ -497,13 +497,12 @@ test('promote-latest touches the registry only after its commit is confirmed as 
   assert.ok(steps[tip].includes('set -euo pipefail'));
 
   // Everything before the check is the checkout that provides the script.
-  assert.deepEqual(
-    steps.slice(0, tip).map((step) => step.split('\n')[0]),
-    ['uses: actions/checkout@v4'],
-  );
+  const before = steps.slice(0, tip).map((step) => step.split('\n')[0]);
+  assert.equal(before.length, 1);
+  assert.match(before[0], /^uses: actions\/checkout@[0-9a-f]{40} # v\d/);
   // Everything after it stands down with it: no login, no retag.
   const after = steps.slice(tip + 1);
-  assert.ok(after.some((step) => step.includes('docker/login-action')));
+  assert.ok(after.some((step) => step.includes('scripts/quay-login.sh')));
   assert.ok(after.some((step) => step.includes('scripts/retag-image.sh') && step.includes(' latest')));
   for (const step of after) {
     assert.ok(step.includes("if: steps.tip.outputs.is_tip == 'true'"), `unconditional step:\n${step}`);
