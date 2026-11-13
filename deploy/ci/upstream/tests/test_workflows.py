@@ -754,7 +754,6 @@ class Publishing(unittest.TestCase):
                 "ci.yml push-manifest": release,
                 "ci.yml promote-latest": release,
                 "ci.yml publish-dev-chart": release,
-                "ci.yml pr-image": ("pr-images", "ai-openshell+console_dev"),
                 "publish.yml tag-image": release,
                 "publish.yml publish-chart": release,
             },
@@ -774,18 +773,10 @@ class Publishing(unittest.TestCase):
     def test_a_pull_request_writes_no_cache_a_release_reads(self):
         build = "\n".join(CI_ALL_JOBS["build"])
         self.assertIn("cache-to: ${{ github.event_name == 'push' && format(", build)
-        self.assertNotIn("cache-to", "\n".join(CI_ALL_JOBS["pr-image"]))
 
-    def test_pr_images_go_to_console_dev_after_approval_and_never_from_a_fork(self):
-        job = CI_ALL_JOBS["pr-image"]
-        text = "\n".join(job)
-        self.assertIn(
-            "    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository",
-            job,
-        )
-        self.assertIn("    environment: pr-images", job)
-        self.assertIn("images: quay.io/ai-openshell/console-dev", text)
-        self.assertNotIn("quay.io/ai-openshell/console\n", text + "\n")
+    def test_a_pull_request_gets_no_image_and_nothing_runs_on_pull_request_target(self):
+        self.assertNotIn("pr-image", CI_ALL_JOBS)
+        self.assertNotIn("console-dev", CI)
         code = "\n".join(line for line in CI.splitlines() if not line.lstrip().startswith("#"))
         self.assertNotIn("pull_request_target", code)
 

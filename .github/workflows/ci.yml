@@ -324,8 +324,8 @@ jobs:
   # else. Quay hands that token out only to the exact subject
   # repo:ai-openshell/console:environment:release, and the environment admits
   # main and release/** only, so a pull request cannot get it even if it edits
-  # this file: its subject is ...:pull_request, which no robot trusts.
-  # Pull request images are the `pr-image` job's, and go to console-dev.
+  # this file: its subject is ...:pull_request, which no robot trusts. A pull
+  # request gets no image.
   build:
     runs-on: ${{ matrix.runner }}
     environment: ${{ github.event_name == 'push' && 'release' || '' }}
@@ -565,59 +565,6 @@ jobs:
             --app-version "sha-${GITHUB_SHA::7}" --destination "$RUNNER_TEMP"
           helm push "$RUNNER_TEMP/openshell-dashboard-0.0.0-dev.tgz" \
             "oci://quay.io/${GITHUB_REPOSITORY,,}/helm-chart"
-
-  # An image of a pull request, to try on a cluster: quay.io/ai-openshell/
-  # console-dev:pr-<n> (and :sha-<7>), linux/amd64. It waits until a
-  # maintainer approves the run in the `pr-images` environment. Its robot,
-  # ai-openshell+console_dev, trusts the subject
-  # repo:ai-openshell/console:environment:pr-images and can write console-dev
-  # and nothing else; the public image is out of its reach. A plain
-  # pull_request run on purpose, never pull_request_target: that would run
-  # with main's cache scope, so a pull request could plant layers that main's
-  # build, and so a release, reuses. Here the cache is only read. A fork's pull
-  # request gets no image: GitHub gives it no OIDC token to trade.
-  pr-image:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04
-    environment: pr-images
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: "22"
-      - name: Derive the gateway release line
-        id: gateway
-        run: |
-          set -euo pipefail
-          node scripts/gateway-range.mjs --format github | tee -a "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-      - name: Sign in to quay.io as the console-dev robot
-        env:
-          QUAY_ROBOT: ${{ vars.QUAY_ROBOT || 'ai-openshell+console_dev' }}
-        run: scripts/quay-login.sh "$QUAY_ROBOT"
-      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
-        id: meta
-        with:
-          images: quay.io/ai-openshell/console-dev
-          tags: |
-            type=ref,event=pr,prefix=pr-
-            type=sha,prefix=sha-,format=short
-      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
-        with:
-          context: .
-          file: deploy/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            GATEWAY_RELEASE_LINE=${{ steps.gateway.outputs.line }}
-            OPENSHELL_SDK_VERSION=${{ steps.gateway.outputs.sdk }}
-            DASHBOARD_COMMIT=${{ github.sha }}
-          cache-from: type=gha,scope=linux/amd64
 
   # The release pipeline (publish.yml, scripts/release/) runs for real only on
   # main and on release branches, after a merge. This job is where a mistake in
