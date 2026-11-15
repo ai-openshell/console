@@ -16,8 +16,6 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
-  Stack,
-  StackItem,
   TextArea,
   TextInput,
 } from '@patternfly/react-core';
@@ -214,72 +212,68 @@ const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
             role="group"
           >
             {credentials.map((cred, index) => (
-              <Stack hasGutter key={index} className="pf-v6-u-mb-sm">
-                <StackItem>
-                  <Grid hasGutter>
-                    <GridItem span={4}>
-                      <TextInput
-                        id={`cred-name-${index}`}
-                        data-testid={`cred-name-${index}`}
-                        value={cred.name}
-                        onChange={(_event, value) =>
-                          setCredentials((rows) =>
-                            rows.map((r, i) =>
-                              i === index ? { ...r, name: value } : r,
-                            ),
-                          )
-                        }
-                        placeholder="Credential name"
-                        aria-label="Credential name"
-                      />
-                    </GridItem>
-                    <GridItem span={4}>
-                      <TextInput
-                        id={`cred-env-${index}`}
-                        data-testid={`cred-env-${index}`}
-                        value={cred.envVarsText}
-                        onChange={(_event, value) =>
-                          setCredentials((rows) =>
-                            rows.map((r, i) =>
-                              i === index ? { ...r, envVarsText: value } : r,
-                            ),
-                          )
-                        }
-                        placeholder="ENV_VARS (comma-separated)"
-                        aria-label="Environment variables"
-                      />
-                    </GridItem>
-                    <GridItem span={2}>
-                      <Checkbox
-                        id={`cred-required-${index}`}
-                        data-testid={`cred-required-${index}`}
-                        label="Required"
-                        isChecked={cred.required}
-                        onChange={(_event, checked) =>
-                          setCredentials((rows) =>
-                            rows.map((r, i) =>
-                              i === index ? { ...r, required: checked } : r,
-                            ),
-                          )
-                        }
-                      />
-                    </GridItem>
-                    <GridItem span={2}>
-                      <Button
-                        variant="link"
-                        onClick={() =>
-                          setCredentials((rows) =>
-                            rows.filter((_, i) => i !== index),
-                          )
-                        }
-                        data-testid={`cred-remove-${index}`}
-                      >
-                        Remove
-                      </Button>
-                    </GridItem>
-                  </Grid>
-                </StackItem>
-              </Stack>
+              <Grid hasGutter key={index} className="pf-v6-u-mb-sm">
+                <GridItem span={4}>
+                  <TextInput
+                    id={`cred-name-${index}`}
+                    data-testid={`cred-name-${index}`}
+                    value={cred.name}
+                    onChange={(_event, value) =>
+                      setCredentials((rows) =>
+                        rows.map((r, i) =>
+                          i === index ? { ...r, name: value } : r,
+                        ),
+                      )
+                    }
+                    placeholder="Credential name"
+                    aria-label="Credential name"
+                  />
+                </GridItem>
+                <GridItem span={4}>
+                  <TextInput
+                    id={`cred-env-${index}`}
+                    data-testid={`cred-env-${index}`}
+                    value={cred.envVarsText}
+                    onChange={(_event, value) =>
+                      setCredentials((rows) =>
+                        rows.map((r, i) =>
+                          i === index ? { ...r, envVarsText: value } : r,
+                        ),
+                      )
+                    }
+                    placeholder="ENV_VARS (comma-separated)"
+                    aria-label="Environment variables"
+                  />
+                </GridItem>
+                <GridItem span={2}>
+                  <Checkbox
+                    id={`cred-required-${index}`}
+                    data-testid={`cred-required-${index}`}
+                    label="Required"
+                    isChecked={cred.required}
+                    onChange={(_event, checked) =>
+                      setCredentials((rows) =>
+                        rows.map((r, i) =>
+                          i === index ? { ...r, required: checked } : r,
+                        ),
+                      )
+                    }
+                  />
+                </GridItem>
+                <GridItem span={2}>
+                  <Button
+                    variant="link"
+                    onClick={() =>
+                      setCredentials((rows) =>
+                        rows.filter((_, i) => i !== index),
+                      )
+                    }
+                    data-testid={`cred-remove-${index}`}
+                  >
+                    Remove
+                  </Button>
+                </GridItem>
+              </Grid>
             ))}
             <Button
               variant="link"
