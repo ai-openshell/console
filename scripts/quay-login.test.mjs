@@ -55,7 +55,7 @@ test('trades the GitHub OIDC token for a robot token and logs docker and helm in
   const result = run(['ai-openshell+console_release']);
   assert.equal(result.status, 0, result.stderr);
   const log = lines();
-  assert.match(log[0], /Authorization: bearer runner-secret .*req\?api-version=2\.0&audience=quay\.io$/);
+  assert.match(log[0], /Authorization: bearer runner-secret .*req\?api-version=2\.0&audience=quay$/);
   assert.match(log[1], /-u ai-openshell\+console_release:gh\.jwt\.sig https:\/\/quay\.io\/oauth2\/federation\/robot\/token$/);
   assert.equal(log[2], 'docker login quay.io -u ai-openshell+console_release --password-stdin <quay.robot.token>');
   assert.equal(log[3], 'helm registry login quay.io -u ai-openshell+console_release --password-stdin <quay.robot.token>');
@@ -84,6 +84,12 @@ test('fails before calling anything when the job may not ask for an OIDC token',
   assert.equal(result.status, 1);
   assert.match(result.stderr, /id-token: write/);
   assert.deepEqual(lines(), []);
+});
+
+test('asks GitHub for the audience QUAY_AUDIENCE names', (t) => {
+  const { run, lines } = setup(t);
+  assert.equal(run(['ai-openshell+console_release'], { QUAY_AUDIENCE: 'other' }).status, 0);
+  assert.match(lines()[0], /&audience=other$/);
 });
 
 test('needs a robot', (t) => {
