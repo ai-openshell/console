@@ -49,6 +49,16 @@ def commit_of(version):
     return hashlib.sha1(("commit of " + version).encode()).hexdigest()
 
 
+def sdk_commit_of(version):
+    """A made-up commit for ai-openshell/sdk-go's tag of a release (no leading v)."""
+    return hashlib.sha1(("sdk-go commit of " + version).encode()).hexdigest()
+
+
+def sdk_of(version):
+    """The plan's SDK for a release: sdk-go's tag of it."""
+    return {"module": pins.SDK_MODULE, "version": "v" + version, "commit": sdk_commit_of(version)}
+
+
 def image(name, version, salt=""):
     return "ghcr.io/nvidia/openshell/%s:%s@%s" % (name, version, digest(name + version + salt))
 
@@ -101,6 +111,8 @@ def target(version, salt="", stable=None):
         "supervisor_image": image("supervisor", version, salt),
         "ready": True,
         "waiting_for": None,
+        "sdk": sdk_of(version),
+        "sdk_waiting_for": None,
     }
 
 
@@ -114,6 +126,11 @@ class FakeUpstream(object):
     def release_tags(self):
         return "\n".join(self.data["tags"]) + "\n"
 
+    def sdk_tags(self):
+        if "sdk_tags" in self.data.get("outage", []):
+            raise upstream.UpstreamError("git ls-remote %s failed: simulated" % upstream.SDK_REPO)
+        return "\n".join(self.data["sdk_tags"]) + "\n"
+
     def image_digest(self, repository, tag):
         key = "%s:%s" % (repository.rsplit("/", 1)[-1], tag)
         self.digest_lookups.append(key)
@@ -122,11 +139,21 @@ class FakeUpstream(object):
         return self.data["images"].get(key)
 
 
-def upstream_data(tags=None, images=None, outage=None, drop=()):
-    """The real upstream of 2026-10-09, with a test's additions on top."""
+def upstream_data(tags=None, images=None, outage=None, drop=(), sdk_missing=()):
+    """The real upstream of 2026-10-09, with a test's additions on top.
+
+    ai-openshell/sdk-go has a tag for every core release tag, except the
+    versions in sdk_missing (no leading v): the ones it has not cut yet.
+    """
     data = copy.deepcopy(fixture("upstream.json"))
     data["tags"] = [text for text in data["tags"] if text.split("refs/tags/")[1] not in drop]
     data["tags"] += ["%s\trefs/tags/%s" % (commit_of(name), name) for name in (tags or [])]
+    names = sorted({text.split("refs/tags/")[1] for text in data["tags"] if not text.endswith("^{}")})
+    data["sdk_tags"] = [
+        "%s\trefs/tags/%s" % (sdk_commit_of(name[1:]), name)
+        for name in names
+        if name.startswith("v") and name[1:] not in sdk_missing
+    ]
     data["images"].update(images or {})
     data["outage"] = list(outage or [])
     return data
@@ -159,12 +186,11 @@ def readme_block(doc):
 class FakeTools(object):
     """Runs in place of pinmove.run_command, and records what was asked of it."""
 
-    def __init__(self, fail=None, stray=None, tagged=None):
+    def __init__(self, fail=None, stray=None, origin=None):
         self.calls = []
-        # {release commit: tag}: `go get` of that commit resolves to the SDK's
-        # own tag, as it does upstream from 0.1.7 on.
-        self.tagged = tagged or {}
-        self.tag_commits = {tag: commit for commit, tag in self.tagged.items()}
+        # {SDK version: commit}: what the module metadata says a tag points
+        # at, when a test wants it to differ from sdk-go's real tag.
+        self.origin = origin or {}
         self.fail = fail  # a command prefix that fails, e.g. ("go", "get")
         self.stray = stray  # a path `go mod tidy` also writes, which it must not
 
@@ -173,19 +199,28 @@ class FakeTools(object):
         if self.fail and tuple(command[: len(self.fail)]) == tuple(self.fail):
             return 1, "%s: simulated failure" % " ".join(command)
         if command[:2] == ["go", "get"]:
-            module, _, commit = command[2].partition("@")
+            module, _, version = command[2].partition("@")
             path = os.path.join(cwd, "go.mod")
             text = _read(path)
-            version = self.tagged.get(commit) or sdk_version(commit)
-            text = re.sub(r"(?m)^\t%s \S+$" % re.escape(module), "\t%s %s" % (module, version), text)
+            line = re.compile(r"(?m)^\t%s \S+$" % re.escape(module))
+            if line.search(text):
+                text = line.sub("\t%s %s" % (module, version), text)
+            else:
+                text = text.replace("require (\n", "require (\n\t%s %s\n" % (module, version), 1)
             _write(path, text)
             return 0, ""
         if command[:3] == ["go", "list", "-m"]:
-            # A tagged SDK: the module metadata names the commit the tag points at.
             module, _, version = command[-1].partition("@")
-            return 0, json.dumps({"Path": module, "Version": version, "Origin": {"Hash": self.tag_commits.get(version, "")}})
+            commit = self.origin.get(version, sdk_commit_of(version[1:]))
+            return 0, json.dumps({"Path": module, "Version": version, "Origin": {"Hash": commit, "Ref": "refs/tags/" + version}})
         if command[:3] == ["go", "mod", "tidy"]:
-            _write(os.path.join(cwd, "go.sum"), go_sum_for(_read(os.path.join(cwd, "go.mod"))))
+            path = os.path.join(cwd, "go.mod")
+            text = _read(path)
+            if not _imports(cwd, pins.LEGACY_SDK_MODULE):
+                # tidy drops a requirement nothing imports.
+                text = re.sub(r"(?m)^\t%s \S+\n" % re.escape(pins.LEGACY_SDK_MODULE), "", text)
+                _write(path, text)
+            _write(os.path.join(cwd, "go.sum"), go_sum_for(text))
             if self.stray:
                 _write(os.path.join(cwd, self.stray), "left behind\n")
             return 0, ""
@@ -205,6 +240,14 @@ class FakeTools(object):
 def _read(path):
     with open(path, encoding="utf-8") as fh:
         return fh.read()
+
+
+def _imports(directory, module):
+    for root, _, files in os.walk(directory):
+        for name in files:
+            if name.endswith(".go") and module in _read(os.path.join(root, name)):
+                return True
+    return False
 
 
 def _write(path, text):
@@ -240,6 +283,14 @@ require (
 )
 """
 
+SDK_USER = "backend/pkg/services/sandbox.go"
+SDK_USER_SOURCE = """package services
+
+import openshell "%s/openshell/v1"
+
+var _ openshell.ClientInterface
+"""
+
 LINE_SOURCE = """package models
 
 // The gateway minor release line this build is for.
@@ -254,32 +305,38 @@ class Repo(object):
     # test that asks: a dozen git commands cost more than copying their result.
     _templates = {}
 
-    def __init__(self, release="0.1.3"):
+    def __init__(self, release="0.1.3", legacy=False):
+        """legacy: on the SDK's old path, as main was until it moved past OpenShell 0.1.8."""
         self.root = tempfile.mkdtemp(prefix="upstream-test-")
         self.origin = os.path.join(self.root, "origin.git")
         self.path = os.path.join(self.root, "work")
-        if release not in Repo._templates:
-            self._build(release)
+        key = (release, legacy)
+        if key not in Repo._templates:
+            self._build(release, legacy)
             template = tempfile.mkdtemp(prefix="upstream-template-")
             atexit.register(shutil.rmtree, template, ignore_errors=True)
             for name in ("origin.git", "work"):
                 shutil.copytree(os.path.join(self.root, name), os.path.join(template, name), symlinks=True)
-            Repo._templates[release] = template
+            Repo._templates[key] = template
             return
         for name in ("origin.git", "work"):
-            shutil.copytree(os.path.join(Repo._templates[release], name), os.path.join(self.root, name), symlinks=True)
+            shutil.copytree(os.path.join(Repo._templates[key], name), os.path.join(self.root, name), symlinks=True)
 
-    def _build(self, release):
+    def _build(self, release, legacy):
         self._git(self.root, "init", "-q", "--bare", self.origin)
         self._git(self.root, "init", "-q", "-b", "main", self.path)
         # Relative, so a copy of the pair still points at its own origin.
         self.git("remote", "add", "origin", "../origin.git")
-        doc = pins_doc(release)
-        go_mod = GO_MOD % (pins.SDK_MODULE, doc["sdk"])
+        if legacy:
+            module, doc = pins.LEGACY_SDK_MODULE, pins_doc(release)
+        else:
+            module, doc = pins.SDK_MODULE, pins_doc(release, sdk="v" + release)
+        go_mod = GO_MOD % (module, doc["sdk"])
         self.write(pinmove.PINS, pins.dump(doc))
         self.write(pinmove.GO_MOD, go_mod)
         self.write(pinmove.GO_SUM, go_sum_for(go_mod))
         self.write(pinmove.LINE_SOURCE, LINE_SOURCE % ".".join(release.split(".")[:2]))
+        self.write(SDK_USER, SDK_USER_SOURCE % module)
         self.write(pinmove.README, "# Dashboard\n\n%s\n\nMore prose.\n" % readme_block(doc))
         package = json.dumps({"dependencies": {"react": "18.0.0"}}, indent=2) + "\n"
         self.write("frontend/package.json", package)

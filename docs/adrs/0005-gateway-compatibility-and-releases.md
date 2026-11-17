@@ -65,6 +65,8 @@ The repository moved from a personal account to the `ai-openshell` organization 
 
 - **A6. A tagged SDK is pinned at its tag.** From OpenShell 0.1.7 upstream tags the SDK module itself (`sdk/go/vX.Y.Z`), and `go get` of the release commit resolves to that tag. The pin is then the tag (`v0.1.7`), and the bump checks with `go list -m -json` that the tag is the release commit; before 0.1.7 it is a pseudo-version of that commit.
 
+- **A7. The SDK comes from ai-openshell/sdk-go, and the bump waits for its tag.** *(2026-11-17)* The Go SDK left the core repository: it is the module `github.com/ai-openshell/sdk-go`, whose tag `vX.Y.Z` is the SDK for core `vX.Y.Z`, cut after core releases by sdk-go's own bump. Follow upstream pins that tag, reading its commit from sdk-go and checking it with `go list -m -json`. While sdk-go has not tagged the target release, the run makes no bump and says so in its summary; it never pins another SDK version or a commit instead. Check A does not need the SDK and runs as before. A branch still on the old path, `github.com/NVIDIA/OpenShell/sdk/go`, stays valid, and the bump that moves it to sdk-go rewrites the BFF's imports in the same commit, the only Go files a pin move may change. The pin is moved by the bump, never by hand, so the import rewrite lands with it.
+
 Decisions 1 to 5 and 9 to 12, and what decisions 6 to 8 say about the pins file, the pin move and check A, still hold.
 
 ### Consequences

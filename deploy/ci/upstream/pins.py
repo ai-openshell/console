@@ -36,9 +36,13 @@ SCHEMA_RE = re.compile(r"^v\d+$")
 # A Go pseudo-version (what `go get module@<commit>` writes) or a tagged
 # release. Never a query such as "latest": a query is not a pin.
 SDK_PSEUDO_RE = re.compile(r"^v\d+\.\d+\.\d+-(?:[0-9A-Za-z.]+\.)?\d{14}-[0-9a-f]{12}$")
-SDK_TAGGED_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+SDK_TAGGED_RE = re.compile(r"^v\d+\.\d+\.\d+(?:-pre\.\d+)?$")
 PSEUDO_COMMIT_RE = re.compile(r"[-.]\d{14}-([0-9a-f]{12})$")
-SDK_MODULE = "github.com/NVIDIA/OpenShell/sdk/go"
+SDK_MODULE = "github.com/ai-openshell/sdk-go"
+# The SDK's path until OpenShell 0.1.8. A go.mod that still requires it is
+# valid until the next pin move takes it off it (pinmove.py).
+LEGACY_SDK_MODULE = "github.com/NVIDIA/OpenShell/sdk/go"
+SDK_MODULES = (SDK_MODULE, LEGACY_SDK_MODULE)
 
 # Tags that move. An image reference carrying one of these is not a release
 # even when a digest is attached, because the gateway inside still resolves
@@ -83,10 +87,22 @@ def known_schemas(pins_path):
     return found
 
 
+def go_mod_sdk_module(go_mod_text):
+    """(module, version) of the SDK backend/go.mod requires, or (None, None).
+
+    The SDK at its own path, github.com/ai-openshell/sdk-go, when go.mod
+    requires it; else at the path it had inside the core repository.
+    """
+    for module in SDK_MODULES:
+        m = re.search(r"^\s*(?:require\s+)?%s\s+(\S+)" % re.escape(module), go_mod_text, re.M)
+        if m:
+            return module, m.group(1)
+    return None, None
+
+
 def go_mod_sdk(go_mod_text):
     """The SDK version required by backend/go.mod, or None."""
-    m = re.search(r"^\s*(?:require\s+)?%s\s+(\S+)" % re.escape(SDK_MODULE), go_mod_text, re.M)
-    return m.group(1) if m else None
+    return go_mod_sdk_module(go_mod_text)[1]
 
 
 def sdk_commit(version):

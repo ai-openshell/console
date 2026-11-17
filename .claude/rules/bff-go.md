@@ -66,7 +66,7 @@ route, so handlers do not import chi.
 The OpenShell Go SDK is the source of truth:
 
 ```go
-import openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
+import openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 ```
 
 Handlers never hold `openshell.ClientInterface` directly. `NewApp` resolves the
@@ -188,7 +188,12 @@ answers a request without a bearer with `unauthorized` (`pkg/auth/proxy.go`).
 
 ## SDK updates
 
-The SDK is pinned to the commit of an OpenShell **release tag** and moves
+The SDK is its own module, `github.com/ai-openshell/sdk-go`
+([ai-openshell/sdk-go](https://github.com/ai-openshell/sdk-go)); until
+OpenShell 0.1.8 it was `github.com/NVIDIA/OpenShell/sdk/go`, with the same
+packages and APIs, and a go.mod still on that path is moved off it, imports
+included, by the next bump. It is pinned to sdk-go's tag of an OpenShell
+**release** (`vX.Y.Z` for core `vX.Y.Z`) and moves
 together with the gateway the branch pins, in one commit (ADR 0005, decision 7;
 hard facts 17 and 20 in `openshell-api.md`). The Follow upstream workflow makes
 that commit, on a `bump/openshell-X.Y.Z` branch with a pull request into

@@ -51,6 +51,10 @@ class Blocked(unittest.TestCase):
         waiting = dict(STABLE, ready=False, waiting_for="upstream has tagged v0.1.4 but has not published its gateway image yet")
         self.assertIn("has not published", publish.blocked(plan_for(waiting)))
 
+    def test_sdk_not_tagged_yet(self):
+        waiting = dict(STABLE, sdk=None, sdk_waiting_for="ai-openshell/sdk-go has not tagged v0.1.4 yet")
+        self.assertIn("has not tagged v0.1.4", publish.blocked(plan_for(waiting)))
+
     def test_any_pull_request_from_the_branch_in_this_repository(self):
         for state in ("OPEN", "CLOSED", "MERGED"):
             self.assertEqual(

@@ -14,7 +14,7 @@ The proxy and the BFF are two containers in one pod: the BFF listens on `127.0.0
 
 **BFF** (`backend/`). A Go HTTP server that serves the REST API under `/api/v1` and the built UI. Routes are declared in `pkg/server/app.go`, with one handler struct per resource in `pkg/handlers/`. Handlers call the interfaces in `pkg/services/`, and `pkg/models/` converts between the SDK's types and the JSON the UI reads. The BFF keeps no state.
 
-**SDK.** The BFF reaches the gateway through the OpenShell Go SDK, `github.com/NVIDIA/OpenShell/sdk/go`, which `backend/go.mod` requires at the commit of the OpenShell release the branch is built on.
+**SDK.** The BFF reaches the gateway through the OpenShell Go SDK, `github.com/ai-openshell/sdk-go`, which `backend/go.mod` requires at the tag of the OpenShell release the branch is built on (sdk-go `vX.Y.Z` is the SDK for OpenShell `vX.Y.Z`). Until OpenShell 0.1.8 the SDK was the `sdk/go` directory of the core repository, `github.com/NVIDIA/OpenShell/sdk/go`; the Follow upstream bump moves a branch off that path.
 
 The directory layout is in [development.md](development.md#layout).
 

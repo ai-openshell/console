@@ -188,6 +188,21 @@ class Plan(Cli):
         self.assertEqual(code, 0)
         self.assertEqual((outputs["target"], outputs["bump"], outputs["branch"]), ("0.1.4-pre.1", "true", "bump/openshell-0.1.4-pre.1"))
 
+    def test_a_release_with_no_sdk_tag_yet_is_tested_but_not_bumped(self):
+        images = {"gateway:0.1.4": support.digest("g"), "supervisor:0.1.4": support.digest("s")}
+        _, outputs, made = self.plan(tags=["v0.1.4"], images=images, sdk_missing=("0.1.4",))
+        # Check A runs on the images; the bump waits for ai-openshell/sdk-go to tag v0.1.4.
+        self.assertEqual((outputs["target"], outputs["ready"], outputs["bump"]), ("0.1.4", "true", "false"))
+        summary = self.read("plan.md")
+        self.assertIn("No bump yet", summary)
+        self.assertIn("ai-openshell/sdk-go has not tagged v0.1.4 yet", summary)
+
+    def test_a_release_with_its_sdk_tag_is_bumped(self):
+        images = {"gateway:0.1.4": support.digest("g"), "supervisor:0.1.4": support.digest("s")}
+        _, outputs, _ = self.plan(tags=["v0.1.4"], images=images)
+        self.assertEqual((outputs["target"], outputs["ready"], outputs["bump"]), ("0.1.4", "true", "true"))
+        self.assertIn("Go SDK `github.com/ai-openshell/sdk-go` `v0.1.4`", self.read("plan.md"))
+
     def test_a_schedule_does_not_bump_to_a_pre_release(self):
         _, outputs, _ = self.plan()
         self.assertEqual((outputs["target"], outputs["bump"]), ("0.1.4-pre.2", "false"))

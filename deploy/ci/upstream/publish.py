@@ -64,6 +64,8 @@ def blocked(plan, pulls=None, branch_sha=None):
         return "there is nothing to bump to"
     if not target.get("ready"):
         return target.get("waiting_for") or "the release's images are not published yet"
+    if not target.get("sdk"):
+        return target.get("sdk_waiting_for") or "the SDK for this release is not tagged yet"
     own = own_pulls(pulls, branch)
     if own:
         first = min(own, key=lambda pull: pull["number"])
@@ -93,7 +95,7 @@ def build(plan, outcome, pulls=None, branch_sha=None, repo_url=""):
         return publish
 
     publish["push"] = {"sha": outcome["sha"]}
-    publish["pr"] = {"title": report.pr_title(target["version"]), "body": report.pr_body(plan, repo_url)}
+    publish["pr"] = {"title": report.pr_title(target["version"]), "body": report.pr_body(plan, repo_url, migrated=bool((outcome.get("moved") or {}).get("migrated")))}
     if repo_url:
         publish["compare"] = "%s/compare/%s...%s?expand=1" % (repo_url.rstrip("/"), BASE, branch)
     return publish

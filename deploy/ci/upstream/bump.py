@@ -80,14 +80,16 @@ class Git(object):
         return done.stdout.strip() if done.returncode == 0 else None
 
 
-def _stage_pin_move(git):
+def _stage_pin_move(git, rewritten=()):
     """Stage the pin move's files. True when there is something to commit.
 
-    The move may change PIN_PATHS and nothing else. A change anywhere else
-    means a tool did something it was not asked to, and it is not committed.
+    The move may change PIN_PATHS, and the Go files it says it rewrote off the
+    SDK's old path, and nothing else. A change anywhere else means a tool did
+    something it was not asked to, and it is not committed.
     """
+    allowed = set(pinmove.PIN_PATHS) | set(rewritten or ())
     changed = [text[3:] for text in git.run("status", "--porcelain").stdout.splitlines() if text.strip()]
-    foreign = [path for path in changed if path not in pinmove.PIN_PATHS]
+    foreign = [path for path in changed if path not in allowed]
     if foreign:
         raise GitError(
             "the pin move changed files it must not: %s. Nothing was committed." % ", ".join(sorted(foreign))
@@ -132,7 +134,7 @@ def prepare(repo, target, mover, message, main_ref="HEAD"):
     try:
         moved = mover(tree, target)
         outcome["moved"] = moved
-        if not _stage_pin_move(work):
+        if not _stage_pin_move(work, (moved or {}).get("rewritten", ())):
             outcome["reason"] = "main already pins OpenShell %s" % target["version"]
             return outcome
         _commit(work, message(target, moved))

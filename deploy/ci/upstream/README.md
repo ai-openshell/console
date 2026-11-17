@@ -17,14 +17,30 @@ python3 deploy/ci/upstream/follow.py require-stable       # fail if it names a p
 python3 deploy/ci/upstream/follow.py plan --out /tmp/plan.json   # what is upstream ahead of this branch?
 ```
 
-`plan` asks the real upstream (`git ls-remote`, and `docker buildx imagetools
-inspect` for the target's image digests). It only reads; it starts nothing.
+`plan` asks the real upstream (`git ls-remote` of NVIDIA/OpenShell and of
+ai-openshell/sdk-go, and `docker buildx imagetools inspect` for the target's
+image digests). It only reads; it starts nothing.
+
+## The SDK
+
+The Go SDK is its own module, `github.com/ai-openshell/sdk-go`. Its tag
+`vX.Y.Z` is the SDK for core `vX.Y.Z`, and sdk-go cuts it after core releases.
+So a target can have its images and no SDK yet: `plan` then sets the target's
+`sdk` to null and `sdk_waiting_for` to why, the `bump` output is `false`, and
+the run summary says the bump waits. Check A still runs. Nothing else is
+pinned in the SDK's place; the next run looks again.
+
+Until OpenShell 0.1.8 the SDK was the `sdk/go` directory of the core
+repository, `github.com/NVIDIA/OpenShell/sdk/go`. The pins check accepts a
+go.mod on either path, and the pin move takes a tree off the old one: it
+rewrites `backend/**/*.go` to the new import path before `go mod tidy`, and
+commits those files with the pin.
 
 ## One release per branch
 
 `deploy/ci/gateway-pins.json` names the one OpenShell release a branch is
 built on. The gateway and supervisor images and the Go SDK all come from that
-release's tag and move together, in one commit.
+release (the SDK from sdk-go's tag of it) and move together, in one commit.
 
 | Branch | Pins | Who moves it |
 |---|---|---|
@@ -151,7 +167,8 @@ gets a branch of its own.
 | File | What moves |
 |---|---|
 | `deploy/ci/gateway-pins.json` | `release`, `gateway_image`, `supervisor_image`, `sdk` |
-| `backend/go.mod`, `backend/go.sum` | the SDK, with `go get <module>@<tag's commit>` and `go mod tidy`. Never `@latest` |
+| `backend/go.mod`, `backend/go.sum` | the SDK, with `go get github.com/ai-openshell/sdk-go@vX.Y.Z` and `go mod tidy`, then `go list -m -json` to check the tag is the commit `plan` read. Never `@latest` |
+| `backend/**/*.go` | only in the move off `github.com/NVIDIA/OpenShell/sdk/go`: the import path |
 | `backend/pkg/models/gateway_release_line.go` | the built-in line, only when the minor changes |
 | `README.md` | the generated block, with `scripts/readme-gateway-range.mjs --write` |
 

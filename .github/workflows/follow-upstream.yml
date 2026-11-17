@@ -16,8 +16,10 @@
 #
 #   bump       Opens a bump: the branch bump/openshell-<version>, which is main
 #              plus ONE commit that moves the pin (gateway and supervisor
-#              images, and the Go SDK at the tag's commit, together), and a
-#              pull request into main. A scheduled run bumps only to a stable
+#              images, and the Go SDK at ai-openshell/sdk-go's tag of the same
+#              version, together), and a pull request into main. sdk-go tags
+#              the SDK after core releases; until it has, there is no bump and
+#              the run summary says so. A scheduled run bumps only to a stable
 #              release; a version asked for by hand is bumped to as it is, so
 #              a pre-release gets a prep branch. The bot makes a bump branch
 #              ONCE: when the branch exists, or any pull request has come from

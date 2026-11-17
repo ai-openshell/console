@@ -87,7 +87,9 @@ def _load_valid_pins(path, go_mod=None):
     if go_mod:
         go_mod_version = pins.go_mod_sdk(_read(go_mod))
         if go_mod_version is None:
-            raise pins.PinsError(["%s does not require %s" % (go_mod, pins.SDK_MODULE)])
+            raise pins.PinsError(
+                ["%s does not require %s (nor %s, its old path)" % (go_mod, pins.SDK_MODULE, pins.LEGACY_SDK_MODULE)]
+            )
     problems = pins.validate(doc, schemas=pins.known_schemas(path), go_mod_version=go_mod_version)
     if problems:
         raise pins.PinsError(problems)
@@ -154,8 +156,8 @@ def cmd_plan(args, upstream=None):
             "ready": "true" if target.get("ready") else "false",
             "target": target.get("version", ""),
             "same_line": "true" if target.get("same_line") else "false",
-            # Something to open a bump branch for, with images to pin.
-            "bump": "true" if target.get("bump") and target.get("ready") else "false",
+            # Something to open a bump branch for, with images and an SDK tag to pin.
+            "bump": "true" if target.get("bump") and target.get("ready") and target.get("sdk") else "false",
             "branch": target.get("branch", ""),
             "gateway_image": target.get("gateway_image") or "",
             "supervisor_image": target.get("supervisor_image") or "",
@@ -193,7 +195,7 @@ def cmd_bump(args, run=None):
             repo,
             target,
             mover=lambda tree, to: pinmove.apply(tree, to, tools=tools, run=run, echo=_echo),
-            message=lambda to, moved: report.commit_message(to, made["pinned"]),
+            message=lambda to, moved: report.commit_message(to, made["pinned"], migrated=moved.get("migrated")),
             main_ref=args.main_ref,
         )
     decided = publish_module.build(made, outcome, pulls=pulls, branch_sha=branch_sha, repo_url=args.repo_url)

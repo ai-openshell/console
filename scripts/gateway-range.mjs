@@ -37,7 +37,11 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const PINS_FILE = 'deploy/ci/gateway-pins.json';
 export const PINS_PATH = join(repoRoot, PINS_FILE);
 export const GO_MOD_PATH = join(repoRoot, 'backend', 'go.mod');
-export const SDK_MODULE = 'github.com/NVIDIA/OpenShell/sdk/go';
+// The Go SDK's own module (ai-openshell/sdk-go), and the path it had inside the
+// core repository until OpenShell 0.1.8. A go.mod still on the old path is
+// moved off it by the next Follow upstream bump.
+export const SDK_MODULE = 'github.com/ai-openshell/sdk-go';
+export const LEGACY_SDK_MODULE = 'github.com/NVIDIA/OpenShell/sdk/go';
 // Where the BFF's built-in line is written, and the name it is written under.
 export const LINE_SOURCE_FILE = 'backend/pkg/models/gateway_release_line.go';
 export const LINE_SOURCE_PATH = join(repoRoot, LINE_SOURCE_FILE);
@@ -112,12 +116,14 @@ export function readGatewayLine(pinsPath = PINS_PATH) {
 /** The SDK version backend/go.mod actually builds against. */
 export function sdkInGoMod(goModPath = GO_MOD_PATH) {
   const goMod = readFileSync(goModPath, 'utf8');
-  const escaped = SDK_MODULE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = goMod.match(new RegExp(`^\\s*(?:require\\s+)?${escaped}\\s+(\\S+)`, 'm'));
-  if (!match) {
-    throw new Error(`${goModPath} does not require ${SDK_MODULE}`);
+  for (const module of [SDK_MODULE, LEGACY_SDK_MODULE]) {
+    const escaped = module.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = goMod.match(new RegExp(`^\\s*(?:require\\s+)?${escaped}\\s+(\\S+)`, 'm'));
+    if (match) {
+      return match[1];
+    }
   }
-  return match[1];
+  throw new Error(`${goModPath} does not require ${SDK_MODULE} (nor ${LEGACY_SDK_MODULE}, its old path)`);
 }
 
 /** The release line compiled into the BFF, as its Go source states it. */
@@ -170,8 +176,9 @@ function check(declared, pinsPath) {
   if (sdk !== declared.sdk) {
     throw new Error(
       `${pinsPath} says "sdk": ${JSON.stringify(declared.sdk)}, but backend/go.mod builds against ${sdk}. ` +
-        'The sdk field must equal the SDK version in backend/go.mod: the SDK at the commit upstream ' +
-        `tagged ${declared.release} with. Bring the stale one of the two in line.`,
+        'The sdk field must equal the SDK version in backend/go.mod: the SDK for the pinned release ' +
+        `(${SDK_MODULE} v${declared.release}, or upstream tagged ${declared.release} with on the old path). ` +
+        'Bring the stale one of the two in line.',
     );
   }
 }

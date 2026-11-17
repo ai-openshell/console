@@ -55,5 +55,24 @@ class Prepare(unittest.TestCase):
         self.assertEqual(self.repo.git("worktree", "list").count("\n"), 0, "the scratch worktree is gone")
 
 
+class OffTheOldPath(unittest.TestCase):
+    prepare = Prepare.prepare
+
+    def setUp(self):
+        self.repo = support.Repo("0.1.3", legacy=True)
+        self.addCleanup(self.repo.close)
+
+    def test_the_rewritten_imports_are_committed_with_the_pins(self):
+        outcome = self.prepare(support.target("0.1.9"))
+        changed = set(self.repo.git("diff", "--name-only", "origin/main", outcome["sha"]).splitlines())
+        self.assertIn(support.SDK_USER, changed)
+        self.assertLessEqual(changed, set(pinmove.PIN_PATHS) | {support.SDK_USER})
+        self.assertIn("github.com/ai-openshell/sdk-go/openshell/v1", self.repo.read(support.SDK_USER, ref=outcome["sha"]))
+
+    def test_a_go_file_the_move_did_not_rewrite_is_still_refused(self):
+        with self.assertRaisesRegex(bump.GitError, "changed files it must not"):
+            self.prepare(support.target("0.1.9"), tools=support.FakeTools(stray="pkg/other.go"))
+
+
 if __name__ == "__main__":
     unittest.main()

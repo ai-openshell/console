@@ -99,7 +99,14 @@ class ReleaseTags(unittest.TestCase):
 
     def test_the_repository_followed_is_openshell(self):
         self.assertEqual(upstream.UPSTREAM_REPO, "https://github.com/NVIDIA/OpenShell.git")
-        self.assertEqual(upstream.SDK_MODULE, "github.com/NVIDIA/OpenShell/sdk/go")
+        self.assertEqual(upstream.SDK_MODULE, "github.com/ai-openshell/sdk-go")
+        self.assertEqual(upstream.SDK_REPO, "https://github.com/ai-openshell/sdk-go.git")
+        self.assertEqual(upstream.LEGACY_SDK_MODULE, "github.com/NVIDIA/OpenShell/sdk/go")
+
+    def test_sdk_tags_are_read_from_sdk_go(self):
+        with mock.patch("subprocess.check_output", return_value="") as check_output:
+            upstream.Upstream().sdk_tags()
+        self.assertEqual(check_output.call_args[0][0], ["git", "ls-remote", "--tags", upstream.SDK_REPO])
         self.assertEqual(upstream.GATEWAY_REPOSITORY, "nvidia/openshell/gateway")
         self.assertEqual(upstream.SUPERVISOR_REPOSITORY, "nvidia/openshell/supervisor")
 

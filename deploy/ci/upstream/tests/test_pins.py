@@ -259,6 +259,28 @@ class Helpers(unittest.TestCase):
         self.assertEqual(pins.go_mod_sdk(single), "v0.1.3")
         self.assertIsNone(pins.go_mod_sdk("module example.com/x\n"))
 
+    def test_go_mod_sdk_reads_the_new_module_and_the_old_path(self):
+        new = "require (\n\t%s v0.1.9\n)\n" % pins.SDK_MODULE
+        old = "require (\n\t%s v0.0.0-20261027154453-ac7f615cd12d\n)\n" % pins.LEGACY_SDK_MODULE
+        self.assertEqual(pins.SDK_MODULE, "github.com/ai-openshell/sdk-go")
+        self.assertEqual(pins.go_mod_sdk_module(new), (pins.SDK_MODULE, "v0.1.9"))
+        self.assertEqual(pins.go_mod_sdk_module(old), (pins.LEGACY_SDK_MODULE, "v0.0.0-20261027154453-ac7f615cd12d"))
+        self.assertEqual(pins.go_mod_sdk_module("module x\n"), (None, None))
+        # While a move is half done both may be listed; the new module is the pin.
+        self.assertEqual(pins.go_mod_sdk(new + old), "v0.1.9")
+
+    def test_the_sdk_field_must_equal_go_mod_on_either_path(self):
+        doc = support.pins_doc("0.1.9", sdk="v0.1.9")
+        self.assertEqual(pins.validate(doc, go_mod_version=pins.go_mod_sdk("require %s v0.1.9\n" % pins.SDK_MODULE)), [])
+        problems = pins.validate(doc, go_mod_version=pins.go_mod_sdk("require %s v0.1.8\n" % pins.SDK_MODULE))
+        self.assertTrue(any("must move in the same commit" in problem for problem in problems))
+
+    def test_a_tagged_pre_release_sdk_is_a_pin(self):
+        doc = support.pins_doc("0.1.9-pre.4", sdk="v0.1.9-pre.4")
+        doc["gateway_image"] = support.image("gateway", "0.1.9-pre.4")
+        doc["supervisor_image"] = support.image("supervisor", "0.1.9-pre.4")
+        self.assertEqual(pins.validate(doc), [])
+
     def test_sdk_commit(self):
         self.assertEqual(pins.sdk_commit("v0.0.0-20261009050449-e1f3c82caa3e"), "e1f3c82caa3e")
         self.assertEqual(pins.sdk_commit("v0.1.4-0.20261009050449-e1f3c82caa3e"), "e1f3c82caa3e")

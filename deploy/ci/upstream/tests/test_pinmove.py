@@ -41,8 +41,10 @@ class MovesEverythingTogether(PinMove):
                 "moved": True,
                 "from": "0.1.3",
                 "to": "0.1.4-pre.2",
-                "sdk": support.sdk_version(self.to["commit"]),
+                "sdk": "v0.1.4-pre.2",
                 "line": None,
+                "migrated": False,
+                "rewritten": [],
             },
         )
 
@@ -51,17 +53,22 @@ class MovesEverythingTogether(PinMove):
         self.assertEqual(doc["release"], "0.1.4-pre.2")
         self.assertEqual(doc["gateway_image"], self.to["gateway_image"])
         self.assertEqual(doc["supervisor_image"], self.to["supervisor_image"])
-        self.assertEqual(doc["sdk"], support.sdk_version(self.to["commit"]))
+        self.assertEqual(doc["sdk"], "v0.1.4-pre.2")
         self.assertTrue(pins.is_canonical(self.repo.read(pinmove.PINS)))
 
-    def test_go_mod_is_on_the_sdk_at_the_tags_commit(self):
-        self.assertEqual(pins.go_mod_sdk(self.repo.read(pinmove.GO_MOD)), self.pins()["sdk"])
-        self.assertIn(self.to["commit"][:12], self.repo.read(pinmove.GO_SUM))
+    def test_go_mod_is_on_the_sdk_go_module_at_the_releases_tag(self):
+        go_mod = self.repo.read(pinmove.GO_MOD)
+        self.assertEqual(pins.go_mod_sdk_module(go_mod), (pins.SDK_MODULE, self.pins()["sdk"]))
+        self.assertIn("%s v0.1.4-pre.2" % pins.SDK_MODULE, self.repo.read(pinmove.GO_SUM))
 
-    def test_the_sdk_is_fetched_at_the_commit_and_tidied_never_at_latest(self):
+    def test_the_sdk_is_fetched_at_its_tag_tidied_and_its_tag_checked_never_at_latest(self):
         self.assertEqual(
-            self.tools.calls[:2],
-            [["go", "get", "%s@%s" % (pins.SDK_MODULE, self.to["commit"])], ["go", "mod", "tidy"]],
+            self.tools.calls[:3],
+            [
+                ["go", "get", "%s@v0.1.4-pre.2" % pins.SDK_MODULE],
+                ["go", "mod", "tidy"],
+                ["go", "list", "-m", "-json", "%s@v0.1.4-pre.2" % pins.SDK_MODULE],
+            ],
         )
         for command in self.tools.calls:
             self.assertNotIn("@latest", " ".join(command))
@@ -88,7 +95,7 @@ class MovesEverythingTogether(PinMove):
     def test_only_go_get_go_mod_tidy_and_the_readme_script_are_run(self):
         # Nothing that builds or executes what was downloaded.
         for command in self.tools.calls:
-            self.assertIn(tuple(command[:2]), (("go", "get"), ("go", "mod"), ("node", command[1])), command)
+            self.assertIn(tuple(command[:2]), (("go", "get"), ("go", "mod"), ("go", "list"), ("node", command[1])), command)
             self.assertNotIn(command[1], ("build", "test", "vet", "run", "install", "generate"))
 
 
@@ -138,7 +145,8 @@ class AlreadyThere(PinMove):
         self.apply(to)
         self.assertTrue(at(to))
         self.assertFalse(at(support.target("0.1.4-pre.2", salt="rebuilt")))
-        self.assertFalse(at(dict(to, commit="f" * 40)))
+        self.assertFalse(at(dict(to, sdk=support.sdk_of("0.1.4"))))
+        self.assertFalse(at(dict(to, sdk=None)))
 
 
 class WhatStopsIt(PinMove):
@@ -155,34 +163,31 @@ class WhatStopsIt(PinMove):
             with self.assertRaises(pinmove.PinMoveError):
                 self.apply(support.target("0.1.4"), support.FakeTools(fail=prefix))
 
-    def test_an_sdk_that_did_not_land_on_the_tags_commit_is_refused(self):
-        # go.mod ends up somewhere other than the commit that was asked for.
+    def test_an_sdk_that_did_not_land_on_the_tag_is_refused(self):
+        # go.mod ends up on some other version than the one that was asked for.
         def elsewhere(command, cwd):
             if command[:2] == ["go", "get"]:
-                command = ["go", "get", "%s@%s" % (pins.SDK_MODULE, "e" * 40)]
+                command = ["go", "get", "%s@v0.1.3" % pins.SDK_MODULE]
             return support.FakeTools()(command, cwd)
 
         with self.assertRaises(pinmove.PinMoveError) as caught:
             self.apply(support.target("0.1.4"), elsewhere)
-        self.assertIn("Nothing is pinned to an SDK other than the one at the release tag", str(caught.exception))
+        self.assertIn("Nothing is pinned to an SDK other than the one tagged for the release", str(caught.exception))
 
-    def test_a_tagged_sdk_is_pinned_when_its_tag_is_the_release_commit(self):
-        # From OpenShell 0.1.7 upstream tags the SDK module, and `go get` of
-        # the release commit resolves to that tag.
-        to = support.target("0.1.4")
-        tools = support.FakeTools(tagged={to["commit"]: "v0.1.4"})
-        result = self.apply(to, tools)
-        self.assertEqual((result["moved"], result["sdk"]), (True, "v0.1.4"))
-        self.assertEqual(self.pins()["sdk"], "v0.1.4")
-        self.assertIn(["go", "list", "-m", "-json", "%s@v0.1.4" % pins.SDK_MODULE], tools.calls)
-
-    def test_a_tagged_sdk_whose_tag_is_another_commit_is_refused(self):
-        to = support.target("0.1.4")
-        tools = support.FakeTools(tagged={to["commit"]: "v0.1.4"})
-        tools.tag_commits["v0.1.4"] = "e" * 40
+    def test_a_tag_that_is_not_the_commit_the_plan_read_is_refused(self):
+        # sdk-go's tag was moved between the plan and the bump.
+        tools = support.FakeTools(origin={"v0.1.4": "e" * 40})
         with self.assertRaises(pinmove.PinMoveError) as caught:
-            self.apply(to, tools)
-        self.assertIn("Nothing is pinned to an SDK other than the one at the release tag", str(caught.exception))
+            self.apply(support.target("0.1.4"), tools)
+        self.assertIn("Nothing is pinned to an SDK other than the one tagged for the release", str(caught.exception))
+
+    def test_a_target_with_no_sdk_tag_yet_is_refused_and_nothing_is_run(self):
+        before = self.repo.read(pinmove.PINS)
+        with self.assertRaises(pinmove.PinMoveError) as caught:
+            self.apply(dict(support.target("0.1.4"), sdk=None))
+        self.assertIn("has not tagged v0.1.4 yet", str(caught.exception))
+        self.assertEqual(self.tools.calls, [])
+        self.assertEqual(self.repo.read(pinmove.PINS), before)
 
     def test_a_target_whose_image_is_of_another_release_is_refused(self):
         to = dict(support.target("0.1.4"), gateway_image=support.image("gateway", "0.1.3"))
@@ -211,6 +216,57 @@ class WhatStopsIt(PinMove):
         code, output = pinmove.run_command(["no-such-tool-anywhere"], self.repo.path)
         self.assertEqual(code, 127)
         self.assertIn("no-such-tool-anywhere", output)
+
+
+class OffTheOldPath(unittest.TestCase):
+    """A tree that still imports github.com/NVIDIA/OpenShell/sdk/go, as main did up to 0.1.8."""
+
+    def setUp(self):
+        self.repo = support.Repo("0.1.3", legacy=True)
+        self.addCleanup(self.repo.close)
+        self.tools = support.FakeTools()
+        self.to = support.target("0.1.9")
+        self.result = pinmove.apply(self.repo.path, self.to, tools=TOOLS, run=self.tools)
+
+    def test_the_move_lands_on_the_new_module_at_the_tag(self):
+        go_mod = self.repo.read(pinmove.GO_MOD)
+        self.assertEqual(pins.go_mod_sdk_module(go_mod), (pins.SDK_MODULE, "v0.1.9"))
+        self.assertNotIn(pins.LEGACY_SDK_MODULE, go_mod)
+        self.assertEqual(pins.load(os.path.join(self.repo.path, pinmove.PINS))["sdk"], "v0.1.9")
+
+    def test_the_imports_are_rewritten_and_reported(self):
+        source = self.repo.read(support.SDK_USER)
+        self.assertIn('"%s/openshell/v1"' % pins.SDK_MODULE, source)
+        self.assertNotIn(pins.LEGACY_SDK_MODULE, source)
+        self.assertEqual((self.result["migrated"], self.result["rewritten"]), (True, [support.SDK_USER]))
+
+    def test_imports_are_rewritten_before_tidy_so_tidy_drops_the_old_path(self):
+        self.assertEqual(
+            [command[:3] for command in self.tools.calls[:2]],
+            [["go", "get", "%s@v0.1.9" % pins.SDK_MODULE], ["go", "mod", "tidy"]],
+        )
+
+    def test_only_the_pin_paths_and_the_rewritten_go_files_change(self):
+        out = self.repo.git("status", "--porcelain")
+        changed = sorted(text.split()[-1] for text in out.splitlines())
+        self.assertEqual(changed, sorted([pinmove.PINS, pinmove.GO_MOD, pinmove.GO_SUM, pinmove.README, support.SDK_USER]))
+
+    def test_an_import_left_on_the_old_path_is_refused(self):
+        repo = support.Repo("0.1.3", legacy=True)
+        self.addCleanup(repo.close)
+
+        def keeps_the_old_import(command, cwd):
+            code, output = support.FakeTools()(command, cwd)
+            if command[:3] == ["go", "mod", "tidy"]:
+                # Something outside backend/**.go still imports the old path.
+                path = os.path.join(cwd, "go.mod")
+                text = support._read(path).replace("require (\n", "require (\n\t%s v0.0.1\n" % pins.LEGACY_SDK_MODULE, 1)
+                support._write(path, text)
+            return code, output
+
+        with self.assertRaises(pinmove.PinMoveError) as caught:
+            pinmove.apply(repo.path, self.to, tools=TOOLS, run=keeps_the_old_import)
+        self.assertIn("still requires %s" % pins.LEGACY_SDK_MODULE, str(caught.exception))
 
 
 if __name__ == "__main__":

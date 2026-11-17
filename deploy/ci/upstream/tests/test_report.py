@@ -50,7 +50,16 @@ class CommitMessage(unittest.TestCase):
     def test_it_says_where_from_where_to_and_which_commit(self):
         text = " ".join(self.message(TODAY).split())
         self.assertIn("from 0.1.3 to 0.1.4-pre.2", text)
-        self.assertIn("upstream tagged v0.1.4-pre.2 (4c1b16a4a104)", text)
+        self.assertIn(
+            "the Go SDK at github.com/ai-openshell/sdk-go v0.1.4-pre.2 (%s)" % support.sdk_commit_of("0.1.4-pre.2")[:12], text
+        )
+        self.assertNotIn("rewrites the BFF's imports", text)
+
+    def test_the_move_off_the_old_path_says_so(self):
+        text = " ".join(report.commit_message(TODAY["target"], TODAY["pinned"], migrated=True).split())
+        self.assertIn("rewrites the BFF's imports from github.com/NVIDIA/OpenShell/sdk/go to it", text)
+        self.assertIn("The SDK moved", report.pr_body(TODAY, REPO_URL, migrated=True))
+        self.assertNotIn("The SDK moved", report.pr_body(TODAY, REPO_URL))
 
     def test_a_pre_release_says_it_cannot_merge_and_a_stable_release_does_not(self):
         self.assertIn("pre-release", self.message(TODAY))
