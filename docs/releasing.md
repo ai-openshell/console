@@ -34,7 +34,7 @@ A pull request never publishes to `console`, even one that edits a workflow: it 
 
 1. Create the public repositories `console` and `console/helm-chart/openshell-dashboard`.
 2. Create the robot `console_release` with write on `console` and the chart and nothing else, and leave the organization's default permissions empty.
-3. On the robot, *Set robot federation* with the issuer `https://token.actions.githubusercontent.com` and the subject in the table above.
+3. On the robot, *Set robot federation* with the issuer `https://token.actions.githubusercontent.com`, the subject in the table above and the audience `quay`, which is what `scripts/quay-login.sh` asks GitHub for (`QUAY_AUDIENCE` overrides it). Quay refuses a token whose audience the robot does not list.
 4. Optionally, an immutability policy on `console` for the tags `^[0-9]+\.[0-9]+\.[0-9]+$` and `^sha-`, so a release or a build cannot be overwritten. `latest` and `X.Y` are meant to move.
 
 Every action in `ci.yml`, `publish.yml` and `follow-upstream.yml` is pinned by commit SHA, because those jobs can publish.

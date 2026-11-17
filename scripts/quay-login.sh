@@ -15,14 +15,15 @@
 #
 # Then docker, and helm when it is installed, are logged in with that token.
 #
-# QUAY_REGISTRY (default quay.io) and QUAY_AUDIENCE (default the registry)
-# override the host and the audience of the GitHub token. Quay checks the
-# audience only when the robot's federation lists one.
+# QUAY_REGISTRY (default quay.io) overrides the host. QUAY_AUDIENCE (default
+# quay) is the audience of the GitHub token, and must be one the robot's
+# federation lists: Quay refuses a token for any other audience once the robot
+# lists one. The ai-openshell robots list `quay`.
 set -euo pipefail
 
 robot="${1:?usage: scripts/quay-login.sh ROBOT (namespace+name)}"
 registry="${QUAY_REGISTRY:-quay.io}"
-audience="${QUAY_AUDIENCE:-$registry}"
+audience="${QUAY_AUDIENCE:-quay}"
 
 if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
   echo "quay-login: no GitHub OIDC token available; the job needs 'permissions: id-token: write'" >&2
