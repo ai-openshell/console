@@ -322,7 +322,9 @@ jobs:
   # the job's GitHub OIDC token for a one-hour token of the robot ai-openshell+console_release,
   # which can write quay.io/ai-openshell/console and its chart and nothing
   # else. Quay hands that token out only to the exact subject
-  # repo:ai-openshell/console:environment:release, and the environment admits
+  # repo:ai-openshell@311201172/console@1316331667:environment:release (the
+  # repository uses GitHub's immutable subjects, which carry the owner's and
+  # the repository's IDs; see docs/releasing.md), and the environment admits
   # main and release/** only, so a pull request cannot get it even if it edits
   # this file: its subject is ...:pull_request, which no robot trusts. A pull
   # request gets no image.

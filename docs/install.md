@@ -176,7 +176,15 @@ securityContext:
 
 To upgrade, run the command of step 6 with a newer `<dashboard version>` of the same release line. `dashboard.image.digest` pins the image by digest. Do not upgrade with `--reuse-values`: it keeps the defaults of the chart version you upgrade from, so a new default, such as the Keycloak sign-out, does not apply. Pass your values file again, or use `--reset-then-reuse-values`.
 
-The chart used to be named `openshell-dashboard`. An install of that chart does not upgrade in place: the new chart names its resources and its `app.kubernetes.io/name` label `console`, and a Deployment's selector cannot change. Uninstall the old release and install this chart. To keep the Secret and the Keycloak client the old install used, set `oidc.existingSecret: openshell-dashboard-oidc` and `oidc.clientId: openshell-dashboard`, or create `console-oidc` and a client `console` as in steps 1 and 4. To uninstall:
+The chart used to be named `openshell-dashboard`. An install of that chart does not upgrade in place: the new chart names its resources and its `app.kubernetes.io/name` label `console`, and a Deployment's selector cannot change. Uninstall the old release, which leaves its Secret in place, and install this chart:
+
+```sh
+helm -n openshell uninstall openshell-dashboard
+```
+
+To keep the Secret and the Keycloak client the old install used, set `oidc.existingSecret: openshell-dashboard-oidc` and `oidc.clientId: openshell-dashboard`, or create `console-oidc` and a client `console` as in steps 1 and 4. Use the old release's name in the command if you installed it under another one (`helm -n openshell list`).
+
+To uninstall this chart:
 
 ```sh
 helm -n openshell uninstall console

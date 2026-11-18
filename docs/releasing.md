@@ -22,11 +22,13 @@ No registry secret is stored anywhere, and the workflow's own token cannot write
 
 | Environment | Who may use it | Robot, and the subject it trusts | It can write | Used by |
 |---|---|---|---|---|
-| `release` | `main` and `release/**` only | `ai-openshell+console_release`, `repo:ai-openshell/console:environment:release` | `console` and `charts/console` | `ci.yml` on a push (`build`, `push-manifest`, `promote-latest`, `publish-dev-chart`) and `publish.yml` (`tag-image`, `publish-chart`) |
+| `release` | `main` and `release/**` only | `ai-openshell+console_release`, `repo:ai-openshell@311201172/console@1316331667:environment:release` | `console` and `charts/console` | `ci.yml` on a push (`build`, `push-manifest`, `promote-latest`, `publish-dev-chart`) and `publish.yml` (`tag-image`, `publish-chart`) |
+
+The repository uses GitHub's immutable subject claims, so the subject starts with the owner and the repository each followed by its numeric ID, not with `repo:ai-openshell/console`. A robot set up with the name-only subject refuses every exchange with `Token does not match robot`. The IDs keep the subject from matching a repository that takes the name later, after a rename or a deletion. To read the prefix GitHub uses: `gh api repos/ai-openshell/console/actions/oidc/customization/sub` (`sub_claim_prefix`).
 
 The environment is what makes the subject mean something: GitHub puts `environment:release` in the token only for a job the environment admitted, so its deployment branches must stay `main` and `release/**`. A variable `QUAY_ROBOT` on an environment overrides the robot's name.
 
-A pull request never publishes to `console`, even one that edits a workflow: it runs with no environment, so its token's subject is `repo:ai-openshell/console:pull_request`, which no robot trusts. It does not write the build cache that `main`'s build, and so a release, reads. `image-range` reads the pushed image anonymously, so the Quay repositories must be public.
+A pull request never publishes to `console`, even one that edits a workflow: it runs with no environment, so its token's subject is `repo:ai-openshell@311201172/console@1316331667:pull_request`, which no robot trusts. It does not write the build cache that `main`'s build, and so a release, reads. `image-range` reads the pushed image anonymously, so the Quay repositories must be public.
 
 **A pull request gets no image.** It is built on both platforms, to prove that it builds, and then discarded. To try a change on a cluster, build the image locally (`make build`) and push it to a registry of your own.
 
