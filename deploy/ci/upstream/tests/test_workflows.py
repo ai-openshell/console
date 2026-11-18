@@ -718,10 +718,12 @@ def code(lines):
 class Publishing(unittest.TestCase):
     """quay.io is written only by a robot whose token a job earns from its environment.
 
-    No registry secret is stored: scripts/quay-login.sh trades the job's GitHub
-    OIDC token for a one-hour robot token, and each robot trusts exactly one
-    environment's subject (docs/releasing.md).
+    No registry secret is stored: the quay-login action (ai-openshell/workflows)
+    trades the job's GitHub OIDC token for a one-hour robot token, and each robot
+    trusts exactly one environment's subject (docs/releasing.md).
     """
+
+    LOGIN = "ai-openshell/workflows/quay-login@"
 
     ALL = [("ci.yml", name, lines) for name, lines in CI_ALL_JOBS.items()] + [
         ("publish.yml", name, lines) for name, lines in jobs(PUBLISH).items()
@@ -741,8 +743,8 @@ class Publishing(unittest.TestCase):
         signers = {}
         for workflow, name, lines in self.ALL:
             text = code(lines)
-            if "scripts/quay-login.sh" in text:
-                robot = re.search(r"QUAY_ROBOT: \$\{\{ vars\.QUAY_ROBOT \|\| '([^']+)' \}\}", text)
+            if self.LOGIN in text:
+                robot = re.search(r"robot: \$\{\{ vars\.QUAY_ROBOT \|\| '([^']+)' \}\}", text)
                 self.assertIsNotNone(robot, "%s %s names no robot" % (workflow, name))
                 self.assertEqual(len(set(re.findall(r"vars\.QUAY_ROBOT \|\| '([^']+)'", text))), 1, name)
                 signers["%s %s" % (workflow, name)] = (job_environment(lines), robot.group(1))
@@ -762,13 +764,32 @@ class Publishing(unittest.TestCase):
     def test_only_the_jobs_that_sign_in_can_ask_for_an_oidc_token(self):
         for workflow, name, lines in self.ALL:
             asks = (permissions(lines) or {}).get("id-token") == "write"
-            signs = "scripts/quay-login.sh" in code(lines)
+            signs = self.LOGIN in code(lines)
             self.assertEqual(asks, signs, "%s %s" % (workflow, name))
 
     def test_the_build_signs_in_only_on_a_push(self):
-        login = [s for s in steps(CI_ALL_JOBS["build"]) if "scripts/quay-login.sh" in "\n".join(s["lines"])]
+        login = [s for s in steps(CI_ALL_JOBS["build"]) if (s["uses"] or "").startswith(self.LOGIN)]
         self.assertEqual(len(login), 1)
         self.assertIn("        if: env.PUBLISH_IMAGE == 'true'", login[0]["lines"])
+
+    def test_each_login_signs_in_the_client_its_job_pushes_with(self):
+        clients = {}
+        for workflow, name, lines in self.ALL:
+            for step in steps(lines):
+                if (step["uses"] or "").startswith(self.LOGIN):
+                    found = [l.split("clients:", 1)[1].strip() for l in step["lines"] if l.strip().startswith("clients:")]
+                    clients["%s %s" % (workflow, name)] = found[0] if found else None
+        self.assertEqual(
+            clients,
+            {
+                "ci.yml build": "docker",
+                "ci.yml push-manifest": "docker",
+                "ci.yml promote-latest": "docker",
+                "ci.yml publish-dev-chart": "helm",
+                "publish.yml tag-image": "docker",
+                "publish.yml publish-chart": "helm",
+            },
+        )
 
     def test_a_pull_request_writes_no_cache_a_release_reads(self):
         build = "\n".join(CI_ALL_JOBS["build"])

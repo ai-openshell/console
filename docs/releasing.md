@@ -18,7 +18,7 @@ Earlier homes, which receive no new release: images up to `0.1.3` are at `quay.i
 
 ## Who can write to quay.io
 
-No registry secret is stored anywhere, and the workflow's own token cannot write any registry (no job asks for `packages: write`). A job that publishes runs `scripts/quay-login.sh`, which asks GitHub for the job's OIDC token and trades it at Quay's robot federation endpoint (`https://quay.io/oauth2/federation/robot/token`) for a robot token that lasts one hour. Quay gives a robot's token only to a GitHub token whose issuer and subject the robot trusts, compared exactly. There is one robot, and it trusts one GitHub environment:
+No registry secret is stored anywhere, and the workflow's own token cannot write any registry (no job asks for `packages: write`). A job that publishes signs in with the [quay-login action](https://github.com/ai-openshell/workflows/tree/main/quay-login) from `ai-openshell/workflows` (pinned by commit), which asks GitHub for the job's OIDC token and trades it at Quay's robot federation endpoint (`https://quay.io/oauth2/federation/robot/token`) for a robot token that lasts one hour. Quay gives a robot's token only to a GitHub token whose issuer and subject the robot trusts, compared exactly. There is one robot, and it trusts one GitHub environment:
 
 | Environment | Who may use it | Robot, and the subject it trusts | It can write | Used by |
 |---|---|---|---|---|
@@ -34,7 +34,7 @@ A pull request never publishes to `console`, even one that edits a workflow: it 
 
 1. Create the public repositories `console` and `console/helm-chart/openshell-dashboard`.
 2. Create the robot `console_release` with write on `console` and the chart and nothing else, and leave the organization's default permissions empty.
-3. On the robot, *Set robot federation* with the issuer `https://token.actions.githubusercontent.com`, the subject in the table above and the audience `quay`, which is what `scripts/quay-login.sh` asks GitHub for (`QUAY_AUDIENCE` overrides it). Quay refuses a token whose audience the robot does not list.
+3. On the robot, *Set robot federation* with the issuer `https://token.actions.githubusercontent.com`, the subject in the table above and the audience `quay`, which is what the quay-login action asks GitHub for by default (its `audience` input overrides it). Quay refuses a token whose audience the robot does not list.
 4. Optionally, an immutability policy on `console` for the tags `^[0-9]+\.[0-9]+\.[0-9]+$` and `^sha-`, so a release or a build cannot be overwritten. `latest` and `X.Y` are meant to move.
 
 Every action in `ci.yml`, `publish.yml` and `follow-upstream.yml` is pinned by commit SHA, because those jobs can publish.
