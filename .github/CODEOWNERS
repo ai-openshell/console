@@ -1,0 +1,19 @@
+# OpenShell console code owners. GitHub requests a review from these owners,
+# and the organization's main-integrity ruleset needs one code owner's approval
+# to merge. Owners are teams, so a maintainer joins or leaves in the
+# organization's team settings and this file does not change.
+
+# The console's maintainers own everything by default. The team has more than
+# one member, so each can approve the other's pull requests.
+* @ai-openshell/console
+
+# CI and release automation: these hold the credentials that publish images and
+# charts and push branches, so a change gets a security review from the
+# organization's infra team. A later rule wins, so these override the default
+# above.
+/.github/ @ai-openshell/infra
+/scripts/release/ @ai-openshell/infra
+/scripts/retag-image.sh @ai-openshell/infra
+/scripts/branch-tip.sh @ai-openshell/infra
+/scripts/quay-login.sh @ai-openshell/infra
+/deploy/ci/upstream/ @ai-openshell/infra
