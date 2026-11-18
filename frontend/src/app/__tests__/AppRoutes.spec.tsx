@@ -320,9 +320,7 @@ describe('AppRoutes', () => {
             : 'Temporary whoami failure',
         ),
       ).toBeInTheDocument();
-      expect(
-        sessionStorage.getItem('console.proxyReauthReload'),
-      ).toBe('1');
+      expect(sessionStorage.getItem('console.proxyReauthReload')).toBe('1');
       sessionExpiredError('unauthorized');
       expect(mockAutoReload).toHaveBeenCalledTimes(1);
       fireEvent.click(
@@ -343,9 +341,7 @@ describe('AppRoutes', () => {
         screen.queryByText('Temporary whoami failure'),
       ).not.toBeInTheDocument();
       expect(mockShellUnmount).not.toHaveBeenCalled();
-      expect(
-        sessionStorage.getItem('console.proxyReauthReload'),
-      ).toBeNull();
+      expect(sessionStorage.getItem('console.proxyReauthReload')).toBeNull();
     },
   );
 
