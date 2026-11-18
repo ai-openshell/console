@@ -144,6 +144,8 @@ func (app *App) Routes() http.Handler {
 	r.Use(chimiddleware.Recoverer)
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(noStore)
+
 		// Public: frontend bootstrap config, no token needed.
 		r.Get("/auth/config", app.GetAuthConfig)
 		// BFF liveness (does not call the gateway).
@@ -280,6 +282,21 @@ func (app *App) Routes() http.Handler {
 	}
 
 	return r
+}
+
+// noStore marks every API response uncacheable. Answers depend on the bearer
+// and change with every write, so a cache between the browser and the BFF (a
+// proxy, a CDN, the browser's own heuristic cache) must never replay one: a
+// list read again after a create would come back without the new item. It is
+// set before the handler runs, so a handler that sets its own Cache-Control
+// keeps it (the logs stream sends "no-cache, no-transform", which already
+// forbids reuse without revalidation and also keeps proxies from buffering
+// the stream). The static frontend is not under /api/v1 and is not affected.
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // serveStatic serves the built frontend with SPA fallback to index.html.
