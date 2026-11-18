@@ -48,7 +48,7 @@ function stepScript(name) {
 }
 
 function tempDir(t) {
-  const dir = mkdtempSync(join(tmpdir(), 'openshell-dashboard-publish-'));
+  const dir = mkdtempSync(join(tmpdir(), 'console-publish-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   return dir;
 }

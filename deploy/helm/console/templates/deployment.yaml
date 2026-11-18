@@ -1,19 +1,19 @@
 {{/* SPDX-FileCopyrightText: Copyright (c) 2026 OpenShell Dashboard contributors
 SPDX-License-Identifier: Apache-2.0 */}}
-{{- include "openshell-dashboard.validateValues" . -}}
+{{- include "console.validateValues" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "openshell-dashboard.fullname" . }}
+  name: {{ include "console.fullname" . }}
   labels:
-    {{- include "openshell-dashboard.labels" . | nindent 4 }}
+    {{- include "console.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "openshell-dashboard.selectorLabels" . | nindent 6 }}
+      {{- include "console.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -21,12 +21,12 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "openshell-dashboard.labels" . | nindent 8 }}
+        {{- include "console.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "openshell-dashboard.serviceAccountName" . }}
+      serviceAccountName: {{ include "console.serviceAccountName" . }}
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: {{ .Values.podLifecycle.terminationGracePeriodSeconds }}
       {{- with .Values.imagePullSecrets }}
@@ -39,7 +39,7 @@ spec:
       {{- end }}
       containers:
         - name: dashboard
-          image: {{ include "openshell-dashboard.image" (dict "root" . "image" .Values.dashboard.image) | quote }}
+          image: {{ include "console.image" (dict "root" . "image" .Values.dashboard.image) | quote }}
           imagePullPolicy: {{ .Values.dashboard.image.pullPolicy | default .Values.global.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
@@ -65,7 +65,7 @@ spec:
             - name: LOGOUT_URL
               value: {{ .Values.dashboard.logoutURL | quote }}
             - name: OPENSHELL_GATEWAY_URL
-              value: {{ include "openshell-dashboard.gatewayURL" . | quote }}
+              value: {{ include "console.gatewayURL" . | quote }}
             {{- if .Values.gateway.caSecretName }}
             - name: GATEWAY_CA_CERT
               value: /etc/openshell/gateway/ca.crt
@@ -112,7 +112,7 @@ spec:
             {{- end }}
           {{- end }}
         - name: oauth2-proxy
-          image: {{ include "openshell-dashboard.image" (dict "root" . "image" .Values.authProxy.image) | quote }}
+          image: {{ include "console.image" (dict "root" . "image" .Values.authProxy.image) | quote }}
           imagePullPolicy: {{ .Values.authProxy.image.pullPolicy | default .Values.global.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
@@ -131,10 +131,10 @@ spec:
             {{- else }}
             - "--http-address=0.0.0.0:{{ .Values.authProxy.port }}"
             {{- end }}
-            {{- with (include "openshell-dashboard.redirectURL" .) }}
+            {{- with (include "console.redirectURL" .) }}
             - --redirect-url={{ . }}
             {{- end }}
-            {{- with (include "openshell-dashboard.backendLogoutURL" .) }}
+            {{- with (include "console.backendLogoutURL" .) }}
             - {{ printf "--backend-logout-url=%s" . | quote }}
             {{- end }}
             {{- with .Values.oidc.scope }}

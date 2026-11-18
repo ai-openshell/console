@@ -69,8 +69,8 @@ authProxy:
 
 # -- Image pull secrets for the dashboard pod.
 imagePullSecrets: []
-# -- Resource name override; pod identity label remains openshell-dashboard.
-nameOverride: "openshell-dashboard"
+# -- Resource name override; the pod's app.kubernetes.io/name label stays console.
+nameOverride: "console"
 # -- Full resource name override.
 fullnameOverride: ""
 
@@ -144,11 +144,11 @@ oidc:
   # -- ConfigMap with ca.crt to trust private issuer TLS (also set on gateway).
   caConfigMapName: ""
   # -- OAuth2-proxy OIDC client ID.
-  clientId: openshell-dashboard
+  clientId: console
   # -- Optional key in oidc.existingSecret holding client ID; when set, takes precedence over oidc.clientId.
   clientIdSecretKey: ""
   # -- Existing Secret containing keys client-secret and cookie-secret.
-  existingSecret: openshell-dashboard-oidc
+  existingSecret: console-oidc
   # -- Full public callback URL; required when host is dynamically allocated. Empty derives from Route/HTTPRoute host.
   redirectURL: ""
   # -- IdP logout URL oauth2-proxy calls from the pod when a user signs out (HTTP GET), so the IdP session ends too; {id_token} is replaced with the session ID token. `auto` derives it from the issuer for provider keycloak-oidc (`<issuer>/protocol/openid-connect/logout?id_token_hint={id_token}`) and sets none for other providers. Empty disables backend logout. Separate from dashboard.logoutURL.
@@ -165,21 +165,21 @@ oidc:
 probes:
   startup:
     # -- Dashboard exec command; the default calls the BFF's loopback self-check.
-    dashboardCommand: [/usr/local/bin/openshell-dashboard, --healthcheck]
+    dashboardCommand: [/usr/local/bin/console, --healthcheck]
     # -- Startup probe failure threshold (dashboard and proxy).
     failureThreshold: 30
     # -- Startup probe period in seconds.
     periodSeconds: 2
   liveness:
     # -- Dashboard exec command for liveness.
-    dashboardCommand: [/usr/local/bin/openshell-dashboard, --healthcheck]
+    dashboardCommand: [/usr/local/bin/console, --healthcheck]
     # -- Liveness probe period in seconds.
     periodSeconds: 10
     # -- Liveness probe failure threshold.
     failureThreshold: 3
   readiness:
     # -- Dashboard exec command for readiness.
-    dashboardCommand: [/usr/local/bin/openshell-dashboard, --healthcheck]
+    dashboardCommand: [/usr/local/bin/console, --healthcheck]
     # -- Readiness probe period in seconds.
     periodSeconds: 5
     # -- Readiness probe failure threshold.

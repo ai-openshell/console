@@ -6,7 +6,7 @@ templates:
 values:
   - ../ci/values-keycloak.yaml
 release:
-  name: openshell-dashboard
+  name: console
   namespace: my-namespace
 tests:
   - it: says nothing about sign-out when it ends the Keycloak session

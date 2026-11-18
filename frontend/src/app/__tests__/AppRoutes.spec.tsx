@@ -295,7 +295,7 @@ describe('AppRoutes', () => {
       fireEvent.change(screen.getByRole('textbox', { name: 'Unsaved draft' }), {
         target: { value: 'keep this' },
       });
-      sessionStorage.setItem('openshell-dashboard.proxyReauthReload', '1');
+      sessionStorage.setItem('console.proxyReauthReload', '1');
       mockUseCurrentUser.mockReturnValue({
         ...idleWhoami,
         data: user,
@@ -321,7 +321,7 @@ describe('AppRoutes', () => {
         ),
       ).toBeInTheDocument();
       expect(
-        sessionStorage.getItem('openshell-dashboard.proxyReauthReload'),
+        sessionStorage.getItem('console.proxyReauthReload'),
       ).toBe('1');
       sessionExpiredError('unauthorized');
       expect(mockAutoReload).toHaveBeenCalledTimes(1);
@@ -344,7 +344,7 @@ describe('AppRoutes', () => {
       ).not.toBeInTheDocument();
       expect(mockShellUnmount).not.toHaveBeenCalled();
       expect(
-        sessionStorage.getItem('openshell-dashboard.proxyReauthReload'),
+        sessionStorage.getItem('console.proxyReauthReload'),
       ).toBeNull();
     },
   );

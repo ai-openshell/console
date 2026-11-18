@@ -1,5 +1,5 @@
 ["helm:docs"]
 description = "Generate the OpenShell Dashboard Helm chart README"
 run = """
-  helm-docs --chart-search-root deploy/helm/openshell-dashboard
+  helm-docs --chart-search-root deploy/helm/console
 """

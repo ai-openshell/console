@@ -24,7 +24,7 @@ The dashboard is one process, the BFF, which also serves the built UI. Configure
 | `-gateway-release-line` | `GATEWAY_RELEASE_LINE` | compiled in | Overrides the gateway release line the build is for, as `major.minor`. For tests and local development ([the compatibility notice](compatibility.md#the-compatibility-notice)) |
 | `-healthcheck` | | | Starts no server: requests `/api/v1/healthz` on `127.0.0.1:$PORT` and exits 0 on a `200`. The chart's probes use it |
 
-The Helm chart sets `LISTEN_ADDRESS=127.0.0.1`, `AUTH_DISABLED=false`, `AUTH_TOKEN_HEADER=x-forwarded-access-token` and `AUTH_USER_HEADER=x-forwarded-user`, and fills the port, the gateway address and certificates, `ADMIN_ROLE`, `USER_ROLE` and `LOGOUT_URL` from its values. It cannot set any other variable; the [chart README](../deploy/helm/openshell-dashboard/README.md) lists its values.
+The Helm chart sets `LISTEN_ADDRESS=127.0.0.1`, `AUTH_DISABLED=false`, `AUTH_TOKEN_HEADER=x-forwarded-access-token` and `AUTH_USER_HEADER=x-forwarded-user`, and fills the port, the gateway address and certificates, `ADMIN_ROLE`, `USER_ROLE` and `LOGOUT_URL` from its values. It cannot set any other variable; the [chart README](../deploy/helm/console/README.md) lists its values.
 
 ## Feature flags
 

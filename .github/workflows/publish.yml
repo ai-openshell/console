@@ -225,8 +225,8 @@ jobs:
           VERSION: ${{ needs.publish.outputs.version }}
         run: |
           set -euo pipefail
-          registry="oci://quay.io/${GITHUB_REPOSITORY,,}/helm-chart"
-          ref="$registry/openshell-dashboard"
+          registry="oci://quay.io/ai-openshell/charts"
+          ref="$registry/console"
           if helm show chart "$ref" --version "$VERSION" > "$RUNNER_TEMP/chart-lookup.log" 2>&1; then
             echo "Chart $ref:$VERSION already exists; leaving immutable version untouched."
             exit 0
@@ -235,6 +235,6 @@ jobs:
             cat "$RUNNER_TEMP/chart-lookup.log"
             exit 1
           fi
-          helm package deploy/helm/openshell-dashboard --version "$VERSION" \
+          helm package deploy/helm/console --version "$VERSION" \
             --app-version "$VERSION" --destination "$RUNNER_TEMP"
-          helm push "$RUNNER_TEMP/openshell-dashboard-${VERSION}.tgz" "$registry"
+          helm push "$RUNNER_TEMP/console-${VERSION}.tgz" "$registry"

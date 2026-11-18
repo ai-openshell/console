@@ -4,7 +4,7 @@ import {
   tryMarkProxyReauthReload,
 } from '../authSession';
 
-const KEY = 'openshell-dashboard.proxyReauthReload';
+const KEY = 'console.proxyReauthReload';
 
 describe('authSession', () => {
   beforeEach(() => {

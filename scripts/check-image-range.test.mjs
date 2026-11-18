@@ -124,7 +124,7 @@ test('the build job passes exactly the args the Dockerfile reads, from the deriv
 });
 
 test('check-image-range.mjs passes a correct image and fails one that claims nothing', (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'openshell-dashboard-image-'));
+  const dir = mkdtempSync(join(tmpdir(), 'console-image-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   // The stand-in docker answers `buildx imagetools inspect` with whatever the
   // test hands it. No registry, no daemon.

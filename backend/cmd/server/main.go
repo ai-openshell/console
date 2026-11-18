@@ -113,7 +113,7 @@ func main() {
 	app.SetProviderProfiles(clients.raw)
 
 	addr := net.JoinHostPort(*listenAddress, *port)
-	slog.Info("openshell-dashboard BFF listening",
+	slog.Info("console BFF listening",
 		"addr", addr,
 		"scheme", inboundScheme(*tlsCert, *tlsKey),
 		"gateway", *gatewayURL,

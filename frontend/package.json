@@ -1,5 +1,5 @@
 {
-  "name": "openshell-dashboard",
+  "name": "console",
   "version": "0.0.0",
   "private": true,
   "description": "OpenShell Dashboard frontend — React + PatternFly 6 admin UI for the OpenShell gateway",

@@ -1,4 +1,4 @@
-const PROXY_REAUTH_RELOAD_KEY = 'openshell-dashboard.proxyReauthReload';
+const PROXY_REAUTH_RELOAD_KEY = 'console.proxyReauthReload';
 
 /** Clear the one-shot reload flag after a successful whoami / re-auth. */
 export const clearProxyReauthReloadFlag = (): void => {

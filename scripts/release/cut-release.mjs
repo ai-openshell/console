@@ -360,7 +360,7 @@ function report(plan, { dryRun }) {
  * request, so there is no state in which the tag exists without its release.
  */
 function createRelease(cwd, plan) {
-  const dir = mkdtempSync(join(tmpdir(), 'openshell-dashboard-release-'));
+  const dir = mkdtempSync(join(tmpdir(), 'console-release-'));
   try {
     const notesFile = join(dir, 'notes.md');
     writeFileSync(notesFile, plan.notes);

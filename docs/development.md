@@ -72,7 +72,7 @@ make build
 docker run --rm -p 8080:8080 \
   -e OPENSHELL_GATEWAY_URL=https://gateway.example.com:17670 \
   -e AUTH_DISABLED=true \
-  openshell-dashboard:latest
+  console:latest
 ```
 
 A gateway with a private CA or a client certificate also needs the files mounted and the [TLS](configuration.md#tls) variables set. This build passes no build arguments, so the image's `gateway.line` and `sdk` labels are empty and **Help → About** shows no commit. The compatibility notice still works: the release line is compiled into the BFF.

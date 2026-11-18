@@ -1,4 +1,4 @@
-IMAGE_NAME ?= openshell-dashboard
+IMAGE_NAME ?= console
 TAG ?= latest
 PLATFORMS ?= linux/amd64,linux/arm64
 
@@ -65,7 +65,7 @@ dev-reset: ## Stop it and delete its data and its sandboxes' containers
 	scripts/dev-env.sh reset
 
 build: ## Build the container image (BFF + static frontend)
-	docker build -t openshell-dashboard:latest -f deploy/Dockerfile .
+	docker build -t console:latest -f deploy/Dockerfile .
 
 buildx:
 	docker buildx build \
@@ -128,7 +128,7 @@ helm-lint: ## Lint and render Helm charts and their example values
 		[ -f "$$chart_file" ] || continue; \
 		chart=$${chart_file%/Chart.yaml}; \
 		set --; \
-		if [ "$$chart" = deploy/helm/openshell-dashboard ]; then \
+		if [ "$$chart" = deploy/helm/console ]; then \
 			set -- --set-string oidc.issuer=https://idp.example.com/realms/openshell; \
 		fi; \
 		helm lint "$$chart" "$$@"; \

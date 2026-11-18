@@ -35,7 +35,7 @@ describe('logout', () => {
     await logout();
 
     expect(assign).toHaveBeenCalledWith('/oauth2/sign_out?rd=/oauth2/sign_in');
-    expect(removeItem).toHaveBeenCalledWith('openshell-dashboard.devMode');
+    expect(removeItem).toHaveBeenCalledWith('console.devMode');
   });
 
   it('uses the proxy sign-in redirect when config omits the URL', async () => {

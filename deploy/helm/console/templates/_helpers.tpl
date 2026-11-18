@@ -4,14 +4,14 @@ SPDX-License-Identifier: Apache-2.0 */}}
 {{/*
 Expand the name of the chart
 */}}
-{{- define "openshell-dashboard.name" -}}
+{{- define "console.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
 Create default fully qualified app name
 */}}
-{{- define "openshell-dashboard.fullname" -}}
+{{- define "console.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -27,20 +27,20 @@ Create default fully qualified app name
 {{/*
 Create chart name and version as used by the chart label
 */}}
-{{- define "openshell-dashboard.chart" -}}
+{{- define "console.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
 Labels
 */}}
-{{- define "openshell-dashboard.selectorLabels" -}}
-app.kubernetes.io/name: openshell-dashboard
+{{- define "console.selectorLabels" -}}
+app.kubernetes.io/name: console
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
-{{- define "openshell-dashboard.labels" -}}
-helm.sh/chart: {{ include "openshell-dashboard.chart" . }}
-{{ include "openshell-dashboard.selectorLabels" . }}
+{{- define "console.labels" -}}
+helm.sh/chart: {{ include "console.chart" . }}
+{{ include "console.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
@@ -48,9 +48,9 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Service account creation
 */}}
-{{- define "openshell-dashboard.serviceAccountName" -}}
+{{- define "console.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
-{{- default (include "openshell-dashboard.fullname" .) .Values.serviceAccount.name -}}
+{{- default (include "console.fullname" .) .Values.serviceAccount.name -}}
 {{- else -}}
 {{- default "default" .Values.serviceAccount.name -}}
 {{- end -}}
@@ -59,7 +59,7 @@ Service account creation
 {{/*
 Image definition
 */}}
-{{- define "openshell-dashboard.image" -}}
+{{- define "console.image" -}}
 {{- $image := .image -}}
 {{- $global := .root.Values.global.image -}}
 {{- $registry := $image.registry | default $global.registry -}}
@@ -74,14 +74,14 @@ Image definition
 {{/*
 Sets the gateway URL 
 */}}
-{{- define "openshell-dashboard.gatewayURL" -}}
+{{- define "console.gatewayURL" -}}
 {{- .Values.gateway.url | default (printf "%s://%s.%s.svc.cluster.local:8080" (ternary "grpcs" "grpc" .Values.gateway.tls.enabled) .Values.gateway.serviceName .Release.Namespace) -}}
 {{- end -}}
 
 {{/*
 Sets the dashboard OIDC redirect URL
 */}}
-{{- define "openshell-dashboard.redirectURL" -}}
+{{- define "console.redirectURL" -}}
 {{- if .Values.oidc.redirectURL -}}
 {{- .Values.oidc.redirectURL -}}
 {{- else if .Values.openshiftRoute.enabled -}}
@@ -95,7 +95,7 @@ Sets the dashboard OIDC redirect URL
 The IdP logout URL oauth2-proxy calls on sign-out. "auto" derives Keycloak's from
 the issuer and sets none for other providers; empty sets none.
 */}}
-{{- define "openshell-dashboard.backendLogoutURL" -}}
+{{- define "console.backendLogoutURL" -}}
 {{- $url := .Values.oidc.backendLogoutURL | default "" | toString -}}
 {{- if eq $url "auto" -}}
 {{- if and (eq .Values.oidc.provider "keycloak-oidc") .Values.oidc.issuer -}}
@@ -109,8 +109,8 @@ the issuer and sets none for other providers; empty sets none.
 {{/*
 Value validation
 */}}
-{{- define "openshell-dashboard.validateValues" -}}
-{{- $url := include "openshell-dashboard.gatewayURL" . -}}
+{{- define "console.validateValues" -}}
+{{- $url := include "console.gatewayURL" . -}}
 {{- if not (or (hasPrefix "grpcs://" $url) (hasPrefix "https://" $url) (hasPrefix "grpc://" $url) (hasPrefix "http://" $url)) -}}
 {{- fail "gateway.url must start with grpcs://, https://, grpc://, or http://" -}}
 {{- end -}}

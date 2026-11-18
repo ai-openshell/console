@@ -6,7 +6,7 @@ templates:
 values:
   - ../ci/values-keycloak.yaml
 release:
-  name: openshell-dashboard
+  name: console
   namespace: my-namespace
 tests:
   - it: gates users on API client roles and matches the gateway admin role

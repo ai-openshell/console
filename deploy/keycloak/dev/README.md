@@ -40,7 +40,7 @@ kubectl -n keycloak exec deploy/keycloak -- sh -c '/opt/keycloak/bin/kcadm.sh co
   --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD"'
 
 # the client secret, for the Secret of the install guide
-ID=$(kc get clients -r openshell -q clientId=openshell-dashboard --fields id --format csv --noquotes)
+ID=$(kc get clients -r openshell -q clientId=console --fields id --format csv --noquotes)
 kc get "clients/$ID/client-secret" -r openshell --fields value --format csv --noquotes
 
 # a user with an email address, Email verified on, and a group
@@ -64,4 +64,4 @@ The commands above cover step 1 of the [install guide](../../../docs/install.md)
 
 Keycloak: run `kubectl -n keycloak port-forward svc/keycloak 8443:8443` and add the line `127.0.0.1 keycloak.keycloak.svc.cluster.local` to `/etc/hosts`, so that the workstation uses the URL the pods use. Its certificate is signed by `ca.crt`.
 
-The dashboard: through your Gateway, as in the guide, or without one. Without one, use [`values-port-forward.yaml`](../../helm/openshell-dashboard/ci/values-port-forward.yaml) in place of the `httpRoute` and `networkPolicy` blocks, leave the sign-out lines out, add `http://localhost:4180/oauth2/callback` to the *Valid redirect URIs* of client `openshell-dashboard`, and run `kubectl -n openshell port-forward svc/openshell-dashboard 4180:4180`.
+The dashboard: through your Gateway, as in the guide, or without one. Without one, use [`values-port-forward.yaml`](../../helm/console/ci/values-port-forward.yaml) in place of the `httpRoute` and `networkPolicy` blocks, leave the sign-out lines out, add `http://localhost:4180/oauth2/callback` to the *Valid redirect URIs* of client `console`, and run `kubectl -n openshell port-forward svc/console 4180:4180`.

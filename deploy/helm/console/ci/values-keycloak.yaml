@@ -21,8 +21,8 @@
 oidc:
   provider: keycloak-oidc
   issuer: https://keycloak.example.com/realms/openshell
-  clientId: openshell-dashboard
-  existingSecret: openshell-dashboard-oidc
+  clientId: console
+  existingSecret: console-oidc
   codeChallengeMethod: S256
   adminRole: openshell-admin
   userRole: openshell-user

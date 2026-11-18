@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # A trial without an ingress, reached through
 #
-#   kubectl -n openshell port-forward svc/openshell-dashboard 4180:4180
+#   kubectl -n openshell port-forward svc/console 4180:4180
 #
 # The callback below has to be among the client's valid redirect URIs. Without
 # an explicit redirect URL oauth2-proxy builds an https:// callback, because
