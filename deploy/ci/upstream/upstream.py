@@ -14,7 +14,15 @@ import subprocess
 
 UPSTREAM_REPO = "https://github.com/NVIDIA/OpenShell.git"
 UPSTREAM_URL = "https://github.com/NVIDIA/OpenShell"
-SDK_MODULE = "github.com/NVIDIA/OpenShell/sdk/go"
+# The Go SDK is its own module, in its own repository, since OpenShell 0.1.7
+# (ai-openshell/sdk-go). Its tag vX.Y.Z is the SDK for core vX.Y.Z, and it is
+# cut after core releases, so for a while a core release has no SDK tag yet.
+SDK_MODULE = "github.com/ai-openshell/sdk-go"
+SDK_REPO = "https://github.com/ai-openshell/sdk-go.git"
+SDK_URL = "https://github.com/ai-openshell/sdk-go"
+# Where the SDK lived until then: a directory of the core repository. A
+# go.mod that still requires it is moved off it by the next pin move.
+LEGACY_SDK_MODULE = "github.com/NVIDIA/OpenShell/sdk/go"
 REGISTRY = "ghcr.io"
 GATEWAY_REPOSITORY = "nvidia/openshell/gateway"
 SUPERVISOR_REPOSITORY = "nvidia/openshell/supervisor"
@@ -55,18 +63,25 @@ class Upstream(object):
     def __init__(self, timeout=120):
         self.timeout = timeout
 
+    def _ls_remote_tags(self, repo):
+        try:
+            return subprocess.check_output(
+                ["git", "ls-remote", "--tags", repo], universal_newlines=True, timeout=self.timeout
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as err:
+            raise UpstreamError("git ls-remote %s failed: %s" % (repo, err))
+
     def release_tags(self):
         """Raw `git ls-remote --tags` output for the upstream repository.
 
         Deliberately without --refs: an annotated tag is listed twice, and only
-        the peeled `^{}` line names the commit. `go get` needs the commit.
+        the peeled `^{}` line names the commit.
         """
-        try:
-            return subprocess.check_output(
-                ["git", "ls-remote", "--tags", UPSTREAM_REPO], universal_newlines=True, timeout=self.timeout
-            )
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as err:
-            raise UpstreamError("git ls-remote %s failed: %s" % (UPSTREAM_REPO, err))
+        return self._ls_remote_tags(UPSTREAM_REPO)
+
+    def sdk_tags(self):
+        """Raw `git ls-remote --tags` output for the SDK's repository, ai-openshell/sdk-go."""
+        return self._ls_remote_tags(SDK_REPO)
 
     def image_digest(self, repository, tag):
         """'sha256:...' for repository:tag on ghcr.io, or None when the tag is not published.

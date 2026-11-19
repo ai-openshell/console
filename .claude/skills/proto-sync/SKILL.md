@@ -13,7 +13,7 @@ moves to the new release, and the handlers and models it affects are audited.
 ## Before you start
 
 You do not move the SDK. It moves together with the gateway the branch pins,
-to the commit of an upstream release tag, and a workflow makes that move
+to ai-openshell/sdk-go's tag of an upstream release, and a workflow makes that move
 (ADR 0005, decision 7; hard facts 17 and 20 in
 `.claude/rules/openshell-api.md`):
 
@@ -49,9 +49,13 @@ git diff origin/main origin/bump/openshell-<release> -- deploy/ci/gateway-pins.j
 ```
 
 Then compare the two SDK versions:
-- `sdk/go/openshell/v1/` for public client methods and resource shapes
-- `sdk/go/openshell/v1/types/` for request/response field details
-- `sdk/go/proto/sandboxv1/` only when the frontend policy protojson contract is involved
+- `openshell/v1/` for public client methods and resource shapes
+- `openshell/v1/types/` for request/response field details
+- `proto/sandboxv1/` only when the frontend policy protojson contract is involved
+
+These are paths in the SDK module, `github.com/ai-openshell/sdk-go` (in
+`sdk/go/` of NVIDIA/OpenShell while go.mod is still on the old path,
+`github.com/NVIDIA/OpenShell/sdk/go`).
 
 ### 2. Check out the bump branch
 

@@ -16,6 +16,8 @@ import {
   lineOf,
   lineOfLanes,
   readGatewayLine,
+  LEGACY_SDK_MODULE,
+  SDK_MODULE,
   sdkInGoMod,
 } from './gateway-range.mjs';
 import { BEGIN, END, README_PATH, renderBlock, replaceBlock } from './readme-gateway-range.mjs';
@@ -118,6 +120,21 @@ test('the committed pins give a line, and name the SDK that backend/go.mod build
   assert.match(declared.release, /^\d+\.\d+\.\d+(-pre\.\d+)?$/);
   assert.ok(declared.release.startsWith(`${declared.line}.`));
   assert.equal(declared.sdk, sdkInGoMod());
+});
+
+// The SDK is its own module, ai-openshell/sdk-go, since OpenShell 0.1.7. A
+// go.mod on the path it had inside the core repository is still read, until
+// the bump that moves it off.
+test('the SDK is read from go.mod on its own module and on its old path', (t) => {
+  const dir = tempDir(t);
+  const goMod = join(dir, 'go.mod');
+  assert.equal(SDK_MODULE, 'github.com/ai-openshell/sdk-go');
+  writeFileSync(goMod, `module x\n\nrequire (\n\t${SDK_MODULE} v0.1.9\n)\n`);
+  assert.equal(sdkInGoMod(goMod), 'v0.1.9');
+  writeFileSync(goMod, `module x\n\nrequire ${LEGACY_SDK_MODULE} ${SDK}\n`);
+  assert.equal(sdkInGoMod(goMod), SDK);
+  writeFileSync(goMod, 'module x\n');
+  assert.throws(() => sdkInGoMod(goMod), /does not require github\.com\/ai-openshell\/sdk-go/);
 });
 
 // The BFF has the line compiled in, so that an image knows it whatever built

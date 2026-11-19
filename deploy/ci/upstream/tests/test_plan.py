@@ -136,6 +136,40 @@ class Targets(unittest.TestCase):
         self.assertIn("supervisor image", made["target"]["waiting_for"])
 
 
+class TheSdkTag(unittest.TestCase):
+    """The SDK for core vX.Y.Z is ai-openshell/sdk-go's tag vX.Y.Z, cut after core releases."""
+
+    IMAGES = images_for("0.1.4")
+
+    def test_the_target_pins_sdk_go_at_the_releases_tag(self):
+        made, _ = build(tags=["v0.1.4"], images=self.IMAGES)
+        target = made["target"]
+        self.assertTrue(target["bump"])
+        self.assertEqual(
+            target["sdk"],
+            {"module": "github.com/ai-openshell/sdk-go", "version": "v0.1.4", "commit": support.sdk_commit_of("0.1.4")},
+        )
+        self.assertIsNone(target["sdk_waiting_for"])
+
+    def test_a_release_sdk_go_has_not_tagged_yet_waits(self):
+        made, _ = build(tags=["v0.1.4"], images=self.IMAGES, sdk_missing=("0.1.4",))
+        target = made["target"]
+        # Still the target, and ready for check A: its images are out.
+        self.assertEqual((target["version"], target["ready"], target["bump"]), ("0.1.4", True, True))
+        # But there is no SDK to pin, and nothing else is pinned in its place.
+        self.assertIsNone(target["sdk"])
+        self.assertIn("ai-openshell/sdk-go has not tagged v0.1.4 yet", target["sdk_waiting_for"])
+
+    def test_an_older_sdk_tag_is_not_taken_instead(self):
+        # sdk-go has v0.1.3 but not v0.1.4: the plan waits rather than pin v0.1.3.
+        made, _ = build(tags=["v0.1.4"], images=self.IMAGES, sdk_missing=("0.1.4", "0.1.4-pre.2"))
+        self.assertIsNone(made["target"]["sdk"])
+
+    def test_an_sdk_go_outage_is_an_error_not_a_missing_tag(self):
+        with self.assertRaises(upstream.UpstreamError):
+            build(tags=["v0.1.4"], images=self.IMAGES, outage=["sdk_tags"])
+
+
 class WhatMustStopTheRun(unittest.TestCase):
     def test_a_registry_outage_is_an_error_not_a_missing_image(self):
         with self.assertRaises(upstream.UpstreamError):

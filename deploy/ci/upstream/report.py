@@ -8,7 +8,7 @@ import textwrap
 
 import bump
 import versions
-from upstream import UPSTREAM_URL
+from upstream import LEGACY_SDK_MODULE, SDK_MODULE, UPSTREAM_URL
 
 ADR_PATH = "docs/adrs/0005-gateway-compatibility-and-releases.md"
 WORKFLOW_PATH = ".github/workflows/follow-upstream.yml"
@@ -65,6 +65,18 @@ def _tag_link(tag):
     return "[%s](%s/releases/tag/%s)" % (tag, UPSTREAM_URL, tag)
 
 
+def _sdk_module(target):
+    return (target.get("sdk") or {}).get("module", SDK_MODULE)
+
+
+def _sdk_version(target):
+    return (target.get("sdk") or {}).get("version", target["tag"])
+
+
+def _sdk_commit(target):
+    return ((target.get("sdk") or {}).get("commit") or "")[:12]
+
+
 # --- the pin commit --------------------------------------------------------
 
 
@@ -72,14 +84,19 @@ def pr_title(release):
     return PR_TITLE % release
 
 
-def commit_message(target, pinned):
+def commit_message(target, pinned, migrated=False):
     """The pin commit's message. The trailer is how the commit is found again."""
     version = target["version"]
     paragraphs = [
         "Moves the OpenShell release this branch is built on from %s to %s: the gateway and "
-        "supervisor images the compatibility suite runs against, and the Go SDK at the commit "
-        "upstream tagged %s (%s)." % (pinned["release"], version, target["tag"], target["commit"][:12])
+        "supervisor images the compatibility suite runs against, and the Go SDK at %s %s (%s)."
+        % (pinned["release"], version, _sdk_module(target), _sdk_version(target), _sdk_commit(target))
     ]
+    if migrated:
+        paragraphs.append(
+            "The SDK is now its own module, %s, so the move also rewrites the BFF's imports from %s "
+            "to it. Its packages and APIs are unchanged." % (SDK_MODULE, LEGACY_SDK_MODULE)
+        )
     if target["line"] != pinned["line"]:
         paragraphs.append(
             "%s starts gateway release line %s, so the line compiled into the BFF moves from %s "
@@ -99,7 +116,7 @@ def commit_message(target, pinned):
 # --- the bump pull request -----------------------------------------------
 
 
-def pr_body(plan, repo_url=""):
+def pr_body(plan, repo_url="", migrated=False):
     """The description of a bump pull request. Written once, when it is opened."""
     target, pinned = plan["target"], plan["pinned"]
     version = target["version"]
@@ -125,8 +142,14 @@ def pr_body(plan, repo_url=""):
         "| release | %s |" % _code(version),
         "| gateway | %s |" % _code(target["gateway_image"]),
         "| supervisor | %s |" % _code(target["supervisor_image"]),
-        "| Go SDK | at %s |" % _code(target["commit"][:12]),
+        "| Go SDK | %s %s (%s) |" % (_code(_sdk_module(target)), _code(_sdk_version(target)), _code(_sdk_commit(target))),
     ]
+    if migrated:
+        lines += [
+            "",
+            "**The SDK moved.** It is now its own module, %s, and this commit also rewrites the BFF's "
+            "imports from %s to it. Its packages and APIs are unchanged." % (_code(SDK_MODULE), _code(LEGACY_SDK_MODULE)),
+        ]
     if target.get("skipped"):
         lines += [
             "",
@@ -339,6 +362,16 @@ def plan_summary(plan, dry_run=False):
     else:
         lines.append("- gateway %s" % _code(target["gateway_image"]))
         lines.append("- supervisor %s" % _code(target["supervisor_image"]))
+    if target.get("sdk"):
+        lines.append(
+            "- Go SDK %s %s (%s)"
+            % (_code(target["sdk"]["module"]), _code(target["sdk"]["version"]), _code(target["sdk"]["commit"][:12]))
+        )
+    elif target["bump"]:
+        lines.append(
+            "- **No bump yet:** %s. Check A does not need the SDK and still runs. The next run looks again."
+            % target["sdk_waiting_for"]
+        )
     return "\n".join(lines) + "\n"
 
 

@@ -18,7 +18,7 @@ Nothing here opens a socket. The network is the Upstream object passed in.
 
 import pins
 import versions
-from upstream import GATEWAY_REPOSITORY, REGISTRY, SUPERVISOR_REPOSITORY
+from upstream import GATEWAY_REPOSITORY, REGISTRY, SDK_MODULE, SDK_URL, SUPERVISOR_REPOSITORY
 
 
 class PlanError(Exception):
@@ -34,6 +34,23 @@ def _images(upstream, version):
             return None, None, "upstream has tagged v%s but has not published its %s image yet" % (version, name)
         refs.append(pins.image_ref("%s/%s" % (REGISTRY, repository), version, digest))
     return refs[0], refs[1], None
+
+
+def _sdk(upstream, version):
+    """(the SDK to pin for this release, why there is none yet).
+
+    The SDK for core vX.Y.Z is ai-openshell/sdk-go's tag vX.Y.Z. sdk-go cuts it
+    after core releases, so a release can have no SDK tag for a while. Then
+    there is nothing to bump to yet: never another SDK version, never a commit.
+    """
+    tag = "v" + version
+    commit = versions.parse_tags(upstream.sdk_tags()).get(tag)
+    if not commit:
+        return None, (
+            "%s has not tagged %s yet. It releases the SDK after core, and the bump waits for it"
+            % (SDK_URL.split("github.com/")[1], tag)
+        )
+    return {"module": SDK_MODULE, "version": tag, "commit": commit}, None
 
 
 def _pin_on_tag(doc, tags):
@@ -115,6 +132,7 @@ def build(doc, upstream, requested=None):
         return plan
 
     gateway, supervisor, waiting_for = _images(upstream, target["version"])
+    sdk, sdk_waiting_for = _sdk(upstream, target["version"])
     new_line = versions.line(target["version"]) != versions.line(pinned)
     plan["target"] = {
         "version": target["version"],
@@ -142,7 +160,11 @@ def build(doc, upstream, requested=None):
         "branch": branch_name(target["version"]),
         "gateway_image": gateway,
         "supervisor_image": supervisor,
+        # Images to test and pin. Check A needs these and nothing else.
         "ready": waiting_for is None,
         "waiting_for": waiting_for,
+        # The SDK to pin. A bump needs it as well.
+        "sdk": sdk,
+        "sdk_waiting_for": sdk_waiting_for,
     }
     return plan
