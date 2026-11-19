@@ -12,10 +12,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/ai-openshell/console/backend/pkg/services"
 	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 	"github.com/ai-openshell/sdk-go/openshell/v1/types"
 	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
-	"github.com/ai-openshell/console/backend/pkg/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

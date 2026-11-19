@@ -177,9 +177,10 @@ func TestSDKProviderProfileStoreWritesWhatTheSDKCanCarry(t *testing.T) {
 	}
 }
 
-// An endpoint with an access preset cannot go through the SDK whole. It is
-// refused before the SDK is called, not stored without the preset.
-func TestSDKProviderProfileStoreRefusesToNarrowAnEndpoint(t *testing.T) {
+// From OpenShell 0.1.9 the SDK carries an endpoint whole, so one with an
+// access preset goes through the SDK-backed store as it is. Before, it was
+// refused before the SDK was called rather than stored without the preset.
+func TestSDKProviderProfileStoreCarriesAnEndpointWhole(t *testing.T) {
 	sdk := &fakeSDKProfiles{}
 	store := NewSDKProviderProfileStore(sdk)
 	ctx := context.Background()
@@ -188,12 +189,12 @@ func TestSDKProviderProfileStoreRefusesToNarrowAnEndpoint(t *testing.T) {
 	_, updateErr := store.UpdateProviderProfile(ctx, "team-a", "custom", 4, ruledItem())
 	_, lintErr := store.LintProviderProfiles(ctx, "team-a", []*pb.ProviderProfileImportItem{ruledItem()})
 	for name, err := range map[string]error{"import": importErr, "update": updateErr, "lint": lintErr} {
-		if !errors.Is(err, models.ErrEndpointNotExpressible) {
-			t.Errorf("%s error = %v, want ErrEndpointNotExpressible", name, err)
+		if errors.Is(err, models.ErrEndpointNotExpressible) {
+			t.Errorf("%s error = %v, want the endpoint sent whole", name, err)
 		}
 	}
-	if len(sdk.calls) != 0 {
-		t.Errorf("the SDK was called (%v) with a profile it would have narrowed", sdk.calls)
+	if len(sdk.calls) != 3 {
+		t.Errorf("SDK calls = %v, want import, update and lint", sdk.calls)
 	}
 }
 

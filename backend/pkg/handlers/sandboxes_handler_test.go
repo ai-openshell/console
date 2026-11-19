@@ -12,9 +12,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 	"github.com/ai-openshell/console/backend/pkg/models"
 	"github.com/ai-openshell/console/backend/pkg/services"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 )
 
 func TestListSandboxes(t *testing.T) {

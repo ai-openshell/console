@@ -3,7 +3,6 @@ package models
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -606,33 +605,35 @@ func TestProviderProfileSurvivesTheSDKRoundTrip(t *testing.T) {
 	}
 }
 
-// An endpoint the SDK can send only in part is refused whole. The gateway
-// stores the endpoint it is sent, so sending three fields of one that had an
-// access preset and rules would store an endpoint without them.
-func TestProviderProfileToSDKRefusesToNarrowAnEndpoint(t *testing.T) {
+// From OpenShell 0.1.9 the SDK's profile endpoint is its policy endpoint, so
+// an endpoint with an access preset, enforcement, rules, several ports or a
+// path goes through the SDK whole: written and read back, it is the endpoint
+// that was sent. Before, the SDK kept a host, a port and a protocol, and these
+// were refused rather than narrowed.
+func TestProviderProfileToSDKCarriesAnEndpointWhole(t *testing.T) {
 	tests := []struct {
 		endpoint *sbv1.NetworkEndpoint
 		name     string
-		refused  bool
 	}{
 		{name: "host, port and protocol", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Port: 443, Protocol: "rest"}},
-		{name: "an access preset", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Access: sbv1.NetworkAccessPreset_NETWORK_ACCESS_PRESET_READ_ONLY}, refused: true},
-		{name: "enforcement", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Enforcement: sbv1.NetworkEnforcementMode_NETWORK_ENFORCEMENT_MODE_ENFORCE}, refused: true},
-		{name: "rules", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Rules: []*sbv1.L7Rule{{Allow: &sbv1.L7Allow{Method: "GET"}}}}, refused: true},
-		{name: "several ports", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Ports: []uint32{80, 443}}, refused: true},
-		{name: "a path", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Path: "/graphql"}, refused: true},
+		{name: "an access preset", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Access: sbv1.NetworkAccessPreset_NETWORK_ACCESS_PRESET_READ_ONLY}},
+		{name: "enforcement", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Enforcement: sbv1.NetworkEnforcementMode_NETWORK_ENFORCEMENT_MODE_ENFORCE}},
+		{name: "rules", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Rules: []*sbv1.L7Rule{{Allow: &sbv1.L7Allow{Method: "GET"}}}}},
+		{name: "several ports", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Ports: []uint32{80, 443}}},
+		{name: "a path", endpoint: &sbv1.NetworkEndpoint{Host: "a.example", Path: "/graphql"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := ProviderProfileToSDK(&pb.ProviderProfile{
+			sdk, err := ProviderProfileToSDK(&pb.ProviderProfile{
 				Id:        "p",
 				Endpoints: []*sbv1.NetworkEndpoint{{Host: "first.example"}, tc.endpoint},
 			})
-			if tc.refused != errors.Is(err, ErrEndpointNotExpressible) {
-				t.Errorf("error = %v, refused = %v, want refused = %v", err, err != nil, tc.refused)
+			if err != nil {
+				t.Fatalf("ProviderProfileToSDK: %v", err)
 			}
-			if tc.refused && !strings.HasPrefix(err.Error(), "endpoints[1]: ") {
-				t.Errorf("error = %v, want it to name endpoints[1]", err)
+			back := ProviderProfileFromSDK(&sdk).GetEndpoints()
+			if len(back) != 2 || !proto.Equal(back[1], tc.endpoint) {
+				t.Errorf("endpoint after the SDK = %v, want %v", back, tc.endpoint)
 			}
 		})
 	}

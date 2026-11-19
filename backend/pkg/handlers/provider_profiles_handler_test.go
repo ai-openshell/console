@@ -12,10 +12,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/ai-openshell/console/backend/pkg/services"
 	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
+	"github.com/ai-openshell/sdk-go/openshell/v1/types"
 	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
 	sbv1 "github.com/ai-openshell/sdk-go/proto/sandboxv1"
-	"github.com/ai-openshell/console/backend/pkg/services"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -671,17 +672,15 @@ func TestProfilesWrittenThroughTheSDK(t *testing.T) {
 		t.Fatalf("the SDK was given %+v\nwant              %+v", imported, wantImported)
 	}
 
+	// From OpenShell 0.1.9 the SDK carries an endpoint whole, so an access
+	// preset goes through to the SDK instead of being refused.
 	ruled := strings.Replace(plain, `"protocol":"rest"`, `"protocol":"rest","access":"NETWORK_ACCESS_PRESET_READ_ONLY"`, 1)
 	w := serveProfiles(handler, http.MethodPost, "/workspaces/team-a/provider-profiles", `{"profiles":[`+ruled+`]}`)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400; body: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body: %s", w.Code, w.Body.String())
 	}
-	answer := decodeObject(t, w)
-	message, _ := answer["message"].(string)
-	if answer["code"] != "invalid_profile" || !strings.Contains(message, "endpoints[0]") {
-		t.Errorf("answer = %v", answer)
-	}
-	if len(imported) != 1 {
-		t.Errorf("the SDK was given a profile whose endpoint it would have stored without its access preset")
+	if len(imported) != 2 || len(imported[1].Profile.Endpoints) != 1 ||
+		imported[1].Profile.Endpoints[0].Access != types.NetworkAccessPresetReadOnly {
+		t.Errorf("the SDK was not given the endpoint with its access preset: %+v", imported)
 	}
 }

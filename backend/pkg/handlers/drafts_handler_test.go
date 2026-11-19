@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
-	sdktypes "github.com/ai-openshell/sdk-go/openshell/v1/types"
 	"github.com/ai-openshell/console/backend/pkg/models"
 	"github.com/ai-openshell/console/backend/pkg/services"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
+	sdktypes "github.com/ai-openshell/sdk-go/openshell/v1/types"
 )
 
 // draftRoutes mounts the draft routes on the paths app.go gives them.
