@@ -30,7 +30,7 @@ RUN CGO_ENABLED=0 go build -o /out/server ./cmd/server
 FROM alpine:3.20
 RUN adduser -D -u 1001 dashboard
 USER 1001
-COPY --from=backend /out/server /usr/local/bin/openshell-dashboard
+COPY --from=backend /out/server /usr/local/bin/console
 COPY --from=frontend /app/frontend/dist /srv/static
 ENV PORT=8080 \
     STATIC_DIR=/srv/static
@@ -61,4 +61,4 @@ ARG OPENSHELL_SDK_VERSION=""
 LABEL io.github.ai-openshell.console.gateway.line="${GATEWAY_RELEASE_LINE}" \
       io.github.ai-openshell.console.sdk="${OPENSHELL_SDK_VERSION}"
 
-ENTRYPOINT ["/usr/local/bin/openshell-dashboard"]
+ENTRYPOINT ["/usr/local/bin/console"]

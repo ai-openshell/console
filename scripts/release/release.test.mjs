@@ -26,7 +26,7 @@ const declared = { line: '0.1', release: '0.1.2', sdk: SDK };
 const previous = { line: '0.1' };
 
 function tempDir(t) {
-  const dir = mkdtempSync(join(tmpdir(), 'openshell-dashboard-release-'));
+  const dir = mkdtempSync(join(tmpdir(), 'console-release-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   return dir;
 }

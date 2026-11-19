@@ -5,7 +5,7 @@ templates:
   - templates/deployment.yaml
   - templates/hpa.yaml
 release:
-  name: openshell-dashboard
+  name: console
   namespace: my-namespace
 set:
   oidc.issuer: https://idp.example.com/realms/openshell
@@ -14,7 +14,7 @@ tests:
     template: templates/deployment.yaml
     set:
       dashboard.image.registry: registry.example.com
-      dashboard.image.repository: mirror/openshell-dashboard
+      dashboard.image.repository: mirror/console
       dashboard.image.tag: ignored
       dashboard.image.digest: sha256:abcdef
       authProxy.image.registry: registry.example.com
@@ -23,7 +23,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: registry.example.com/mirror/openshell-dashboard@sha256:abcdef
+          value: registry.example.com/mirror/console@sha256:abcdef
       - equal:
           path: spec.template.spec.containers[1].image
           value: registry.example.com/mirror/oauth2-proxy@sha256:123456

@@ -18,15 +18,15 @@ Two things here are called a gateway. "The gateway" is the OpenShell gateway, wh
 
 Import [`deploy/keycloak/openshell-realm.json`](../deploy/keycloak/openshell-realm.json) ([about the file](../deploy/keycloak/README.md)): in the admin console, *Create realm*, then *Resource file*; or start Keycloak with `--import-realm`. Then, in realm `openshell`:
 
-1. Client `openshell-dashboard`, *Settings*: set *Valid redirect URIs* to `https://dashboard.example.com/oauth2/callback`.
-2. Client `openshell-dashboard`, *Credentials*: copy the client secret.
+1. Client `console`, *Settings*: set *Valid redirect URIs* to `https://dashboard.example.com/oauth2/callback`.
+2. Client `console`, *Credentials*: copy the client secret.
 3. Create the users: each with an email address, *Email verified* on, and membership of `openshell-admins` or `openshell-users`. A new user has *Email verified* off, and oauth2-proxy refuses the sign-in of a user whose email is not verified.
 
 To create the objects by hand instead, use the table in the [realm file's README](../deploy/keycloak/README.md). No custom audience mapper or client scope is needed.
 
 ## 2. Check a token
 
-In the admin console: client `openshell-dashboard`, *Client scopes*, *Evaluate*, pick a user, *Generated access token*. It must show:
+In the admin console: client `console`, *Client scopes*, *Evaluate*, pick a user, *Generated access token*. It must show:
 
 ```json
 { "aud": "openshell-api",
@@ -73,8 +73,8 @@ A `0.1.3` chart still reads these names, as deprecated aliases. OpenShell docume
 ## 4. Create the Secret
 
 ```sh
-kubectl -n openshell create secret generic openshell-dashboard-oidc \
-  --from-literal=client-secret='<client secret of the openshell-dashboard client>' \
+kubectl -n openshell create secret generic console-oidc \
+  --from-literal=client-secret='<client secret of the console client>' \
   --from-literal=cookie-secret="$(openssl rand -hex 16)"
 ```
 
@@ -114,17 +114,17 @@ networkPolicy:
 ## 6. Install
 
 ```sh
-helm upgrade --install openshell-dashboard \
-  oci://quay.io/ai-openshell/console/helm-chart/openshell-dashboard \
+helm upgrade --install console \
+  oci://quay.io/ai-openshell/charts/console \
   --version <dashboard version> --namespace openshell -f values.yaml
 ```
 
 `<dashboard version>` is the newest dashboard release whose first two numbers match your gateway's: a `0.1.N` for a gateway `0.1.x` ([Compatibility](../README.md#compatibility), [releases](https://github.com/ai-openshell/console/releases)). Releases up to `0.1.2` were also published at `oci://ghcr.io/gkrumbach07/openshell-dashboard/helm-chart/openshell-dashboard`, the chart's home before the repository moved; that path receives no newer release. Then check:
 
 ```sh
-kubectl -n openshell rollout status deploy/openshell-dashboard
-kubectl -n openshell get httproute openshell-dashboard -o jsonpath='{.status.parents[*].conditions}'
-helm -n openshell get notes openshell-dashboard
+kubectl -n openshell rollout status deploy/console
+kubectl -n openshell get httproute console -o jsonpath='{.status.parents[*].conditions}'
+helm -n openshell get notes console
 ```
 
 The second command has to show the condition `Accepted` with status `True`; otherwise the Gateway does not admit the namespace (reason `NotAllowedByListeners`), or `sectionName` is not one of its listeners (`NoMatchingParent`). The notes print the dashboard's URL, the callback to register and the gateway's address.
@@ -164,21 +164,31 @@ securityContext:
 - Set `host`. The callback is `https://<route host>/oauth2/callback`, and the chart cannot derive it from a host the router assigns. Use the same host in the client's redirect URIs.
 - The two `null` values let the `restricted-v2` SCC assign the user and group.
 - The NetworkPolicy admits namespace `openshift-ingress` by default. A router on the host network needs `networkPolicy.ingressFrom`.
-- For reencrypt, see [`values-route-reencrypt.yaml`](../deploy/helm/openshell-dashboard/ci/values-route-reencrypt.yaml).
+- For reencrypt, see [`values-route-reencrypt.yaml`](../deploy/helm/console/ci/values-route-reencrypt.yaml).
 
 ## Other ways to expose it
 
 - Let the chart create the Gateway (`httpRoute.gateway.create: true`, `className`, `listener.tls.certificateRefs`). It then names the listener and sets `sectionName` itself.
-- Bring your own Ingress or load balancer to Service `openshell-dashboard`, port 4180. Leave both routes off, and set `oidc.redirectURL` to `https://<host>/oauth2/callback` and `networkPolicy.ingressNamespace` to the controller's namespace.
-- Try it through a port-forward, with [`values-port-forward.yaml`](../deploy/helm/openshell-dashboard/ci/values-port-forward.yaml). Add `http://localhost:4180/oauth2/callback` to the client's *Valid redirect URIs*. The browser has to keep Secure cookies on `http://localhost`.
+- Bring your own Ingress or load balancer to Service `console`, port 4180. Leave both routes off, and set `oidc.redirectURL` to `https://<host>/oauth2/callback` and `networkPolicy.ingressNamespace` to the controller's namespace.
+- Try it through a port-forward, with [`values-port-forward.yaml`](../deploy/helm/console/ci/values-port-forward.yaml). Add `http://localhost:4180/oauth2/callback` to the client's *Valid redirect URIs*. The browser has to keep Secure cookies on `http://localhost`.
 
 ## Upgrade and uninstall
 
-To upgrade, run the command of step 6 with a newer `<dashboard version>` of the same release line. `dashboard.image.digest` pins the image by digest. Do not upgrade with `--reuse-values`: it keeps the defaults of the chart version you upgrade from, so a new default, such as the Keycloak sign-out, does not apply. Pass your values file again, or use `--reset-then-reuse-values`. To uninstall:
+To upgrade, run the command of step 6 with a newer `<dashboard version>` of the same release line. `dashboard.image.digest` pins the image by digest. Do not upgrade with `--reuse-values`: it keeps the defaults of the chart version you upgrade from, so a new default, such as the Keycloak sign-out, does not apply. Pass your values file again, or use `--reset-then-reuse-values`.
+
+The chart used to be named `openshell-dashboard`. An install of that chart does not upgrade in place: the new chart names its resources and its `app.kubernetes.io/name` label `console`, and a Deployment's selector cannot change. Uninstall the old release, which leaves its Secret in place, and install this chart:
 
 ```sh
 helm -n openshell uninstall openshell-dashboard
-kubectl -n openshell delete secret openshell-dashboard-oidc
+```
+
+To keep the Secret and the Keycloak client the old install used, set `oidc.existingSecret: openshell-dashboard-oidc` and `oidc.clientId: openshell-dashboard`, or create `console-oidc` and a client `console` as in steps 1 and 4. Use the old release's name in the command if you installed it under another one (`helm -n openshell list`).
+
+To uninstall this chart:
+
+```sh
+helm -n openshell uninstall console
+kubectl -n openshell delete secret console-oidc
 ```
 
 ## Troubleshooting

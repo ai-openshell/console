@@ -1,8 +1,8 @@
 {{/* SPDX-FileCopyrightText: Copyright (c) 2026 OpenShell Dashboard contributors
 SPDX-License-Identifier: Apache-2.0 */}}
-{{- $callback := include "openshell-dashboard.redirectURL" . -}}
+{{- $callback := include "console.redirectURL" . -}}
 {{- if .Values.openshiftRoute.enabled }}
-Dashboard: https://{{ .Values.openshiftRoute.host | default (printf "<assigned Route host: kubectl get route %s>" (include "openshell-dashboard.fullname" .)) }}
+Dashboard: https://{{ .Values.openshiftRoute.host | default (printf "<assigned Route host: kubectl get route %s>" (include "console.fullname" .)) }}
 {{- else if .Values.httpRoute.enabled }}
 Dashboard: https://{{ first .Values.httpRoute.hostnames | default "<HTTPRoute hostname>" }}
 {{- else }}
@@ -11,12 +11,12 @@ Dashboard: configure openshiftRoute or httpRoute to expose the proxy Service.
 Register this URL on the OIDC client:
   Valid redirect URIs (login): {{ $callback | default "<set oidc.redirectURL to https://your-host/oauth2/callback>" }}
 
-Gateway: {{ include "openshell-dashboard.gatewayURL" . }}
+Gateway: {{ include "console.gatewayURL" . }}
 Verify the IdP access token includes audience {{ .Values.oidc.audience | quote }} (gateway server.oidc.audience).
 {{- if .Values.gateway.preflight.enabled }}
 Gateway Service existence was checked in the release namespace.
 {{- end }}
-{{- if not (or (include "openshell-dashboard.backendLogoutURL" .) (contains "rd=http" (.Values.dashboard.logoutURL | default ""))) }}
+{{- if not (or (include "console.backendLogoutURL" .) (contains "rd=http" (.Values.dashboard.logoutURL | default ""))) }}
 
 Sign-out ends only the dashboard session. The identity provider's session stays,
 so the next visit signs the same user in again without a password. Set

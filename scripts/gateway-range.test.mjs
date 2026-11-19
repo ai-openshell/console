@@ -28,7 +28,7 @@ const pinned = (release) => ({ release, sdk: SDK });
 const run = (script, ...args) => spawnSync(process.execPath, [join(scripts, script), ...args], { encoding: 'utf8' });
 
 function tempDir(t) {
-  const dir = mkdtempSync(join(tmpdir(), 'openshell-dashboard-range-'));
+  const dir = mkdtempSync(join(tmpdir(), 'console-range-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   return dir;
 }

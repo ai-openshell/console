@@ -4,9 +4,9 @@ SPDX-License-Identifier: Apache-2.0 */}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: {{ .Values.httpRoute.gateway.name | default (include "openshell-dashboard.fullname" .) }}
+  name: {{ .Values.httpRoute.gateway.name | default (include "console.fullname" .) }}
   labels:
-    {{- include "openshell-dashboard.labels" . | nindent 4 }}
+    {{- include "console.labels" . | nindent 4 }}
 spec:
   gatewayClassName: {{ .Values.httpRoute.gateway.className }}
   listeners:

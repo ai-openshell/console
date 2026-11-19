@@ -42,7 +42,7 @@
       "serviceAccountsEnabled": false
     },
     {
-      "clientId": "openshell-dashboard",
+      "clientId": "console",
       "description": "OpenShell Dashboard: the confidential client its auth proxy (oauth2-proxy) signs users in with.",
       "enabled": true,
       "protocol": "openid-connect",
@@ -79,7 +79,7 @@
   "clientScopeMappings": {
     "openshell-api": [
       {
-        "client": "openshell-dashboard",
+        "client": "console",
         "roles": ["openshell-admin", "openshell-user"]
       },
       {

@@ -15,8 +15,8 @@ Deploys one stateless dashboard Deployment alongside an [OpenShell gateway](http
 - A Secret with that client's secret and a cookie secret. The chart does not create it:
 
 ```sh
-kubectl -n openshell create secret generic openshell-dashboard-oidc \
-  --from-literal=client-secret='<client secret of the openshell-dashboard client>' \
+kubectl -n openshell create secret generic console-oidc \
+  --from-literal=client-secret='<client secret of the console client>' \
   --from-literal=cookie-secret="$(openssl rand -hex 16)"
 ```
 
@@ -48,8 +48,8 @@ networkPolicy:
 Install the published chart:
 
 ```sh
-helm upgrade --install openshell-dashboard \
-  oci://quay.io/ai-openshell/console/helm-chart/openshell-dashboard \
+helm upgrade --install console \
+  oci://quay.io/ai-openshell/charts/console \
   --version <dashboard version> --namespace openshell -f values.yaml
 ```
 
@@ -63,14 +63,14 @@ These files are in the repository, not in the packaged chart. CI renders each on
 
 | File | When it applies |
 |---|---|
-| [`values-keycloak.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-keycloak.yaml) | Keycloak as the identity provider: the role gate, PKCE, and a sign-out that ends the Keycloak session |
-| [`values-gateway-api.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-gateway-api.yaml) | An HTTPRoute attached to an existing Gateway |
-| [`values-port-forward.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-port-forward.yaml) | A trial through `kubectl port-forward`, without an ingress |
-| [`values-route-edge.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-route-edge.yaml) | An OpenShift Route that terminates TLS at the router |
-| [`values-route-reencrypt.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-route-reencrypt.yaml) | An OpenShift Route with reencrypt, where oauth2-proxy serves HTTPS |
-| [`values-openshift-scc.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-openshift-scc.yaml) | OpenShift's `restricted-v2` SCC, which assigns the user and group |
-| [`values-mtls-client-cert.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-mtls-client-cert.yaml) | A gateway that requires a client certificate and has no OIDC |
-| [`values-tls-disabled.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/openshell-dashboard/ci/values-tls-disabled.yaml) | A gateway that runs without TLS, on a trusted network |
+| [`values-keycloak.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/console/ci/values-keycloak.yaml) | Keycloak as the identity provider: the role gate, PKCE, and a sign-out that ends the Keycloak session |
+| [`values-gateway-api.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/console/ci/values-gateway-api.yaml) | An HTTPRoute attached to an existing Gateway |
+| [`values-port-forward.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/console/ci/values-port-forward.yaml) | A trial through `kubectl port-forward`, without an ingress |
+| [`values-route-edge.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/console/ci/values-route-edge.yaml) | An OpenShift Route that terminates TLS at the router |
+| [`values-route-reencrypt.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/console/ci/values-route-reencrypt.yaml) | An OpenShift Route with reencrypt, where oauth2-proxy serves HTTPS |
+| [`values-openshift-scc.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/console/ci/values-openshift-scc.yaml) | OpenShift's `restricted-v2` SCC, which assigns the user and group |
+| [`values-mtls-client-cert.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/console/ci/values-mtls-client-cert.yaml) | A gateway that requires a client certificate and has no OIDC |
+| [`values-tls-disabled.yaml`](https://github.com/ai-openshell/console/blob/main/deploy/helm/console/ci/values-tls-disabled.yaml) | A gateway that runs without TLS, on a trusted network |
 
 ## Configuration notes
 
@@ -153,7 +153,7 @@ These files are in the repository, not in the packaged chart. CI renders each on
 | httpRoute.gateway.sectionName | string | `""` | Listener name when attaching to an existing Gateway. Set it to the HTTPS listener: without it the route attaches to every listener that admits it. For a Gateway this chart creates, the chart sets it. |
 | httpRoute.hostnames | list | `[]` | Public hostnames; first hostname supplies callback URL if redirectURL is empty. |
 | imagePullSecrets | list | `[]` | Image pull secrets for the dashboard pod. |
-| nameOverride | string | `"openshell-dashboard"` | Resource name override; pod identity label remains openshell-dashboard. |
+| nameOverride | string | `"console"` | Resource name override; the pod's app.kubernetes.io/name label stays console. |
 | networkPolicy.enabled | bool | `true` | Restrict ingress to the proxy port from the ingress controller namespace. |
 | networkPolicy.ingressFrom | list | `[]` | Optional ingress peers replacing the default namespace selector (e.g. host-network routers or Gateway data-plane pods). |
 | networkPolicy.ingressNamespace | string | `""` | Namespace of ingress data-plane pods. Defaults to openshift-ingress for Routes; required for HTTPRoute unless ingressFrom is set. |
@@ -164,10 +164,10 @@ These files are in the repository, not in the packaged chart. CI renders each on
 | oidc.audience | string | `"openshell-api"` | Expected audience claim for the API resource server. IdP must add it to token aud. Purely informational: the chart only prints it in the post-install notes. |
 | oidc.backendLogoutURL | string | `"auto"` | IdP logout URL oauth2-proxy calls from the pod when a user signs out (HTTP GET), so the IdP session ends too; {id_token} is replaced with the session ID token. `auto` derives it from the issuer for provider keycloak-oidc (`<issuer>/protocol/openid-connect/logout?id_token_hint={id_token}`) and sets none for other providers. Empty disables backend logout. Separate from dashboard.logoutURL. |
 | oidc.caConfigMapName | string | `""` | ConfigMap with ca.crt to trust private issuer TLS (also set on gateway). |
-| oidc.clientId | string | `"openshell-dashboard"` | OAuth2-proxy OIDC client ID. |
+| oidc.clientId | string | `"console"` | OAuth2-proxy OIDC client ID. |
 | oidc.clientIdSecretKey | string | `""` | Optional key in oidc.existingSecret holding client ID; when set, takes precedence over oidc.clientId. |
 | oidc.codeChallengeMethod | string | `""` | PKCE challenge method (e.g. S256); empty disables PKCE for providers that do not support it. |
-| oidc.existingSecret | string | `"openshell-dashboard-oidc"` | Existing Secret containing keys client-secret and cookie-secret. |
+| oidc.existingSecret | string | `"console-oidc"` | Existing Secret containing keys client-secret and cookie-secret. |
 | oidc.issuer | string | `""` | OIDC issuer URL (e.g. https://keycloak.example.com/realms/openshell) |
 | oidc.provider | string | `"oidc"` | oauth2-proxy provider (oidc for generic OIDC, keycloak-oidc for Keycloak role filtering). |
 | oidc.redirectURL | string | `""` | Full public callback URL; required when host is dynamically allocated. Empty derives from Route/HTTPRoute host. |
@@ -183,13 +183,13 @@ These files are in the repository, not in the packaged chart. CI renders each on
 | podLabels | object | `{}` | Extra pod labels; cannot override identity/instance selector labels. |
 | podLifecycle.terminationGracePeriodSeconds | int | `30` | Pod termination grace period in seconds. |
 | podSecurityContext.fsGroup | int | `1000` | fsGroup of the pod; on OpenShift set podSecurityContext to null. |
-| probes.liveness.dashboardCommand | list | `["/usr/local/bin/openshell-dashboard","--healthcheck"]` | Dashboard exec command for liveness. |
+| probes.liveness.dashboardCommand | list | `["/usr/local/bin/console","--healthcheck"]` | Dashboard exec command for liveness. |
 | probes.liveness.failureThreshold | int | `3` | Liveness probe failure threshold. |
 | probes.liveness.periodSeconds | int | `10` | Liveness probe period in seconds. |
-| probes.readiness.dashboardCommand | list | `["/usr/local/bin/openshell-dashboard","--healthcheck"]` | Dashboard exec command for readiness. |
+| probes.readiness.dashboardCommand | list | `["/usr/local/bin/console","--healthcheck"]` | Dashboard exec command for readiness. |
 | probes.readiness.failureThreshold | int | `3` | Readiness probe failure threshold. |
 | probes.readiness.periodSeconds | int | `5` | Readiness probe period in seconds. |
-| probes.startup.dashboardCommand | list | `["/usr/local/bin/openshell-dashboard","--healthcheck"]` | Dashboard exec command; the default calls the BFF's loopback self-check. |
+| probes.startup.dashboardCommand | list | `["/usr/local/bin/console","--healthcheck"]` | Dashboard exec command; the default calls the BFF's loopback self-check. |
 | probes.startup.failureThreshold | int | `30` | Startup probe failure threshold (dashboard and proxy). |
 | probes.startup.periodSeconds | int | `2` | Startup probe period in seconds. |
 | replicaCount | int | `1` | Number of stateless dashboard pods (ignored when autoscaling is enabled). |

@@ -4,7 +4,7 @@
 # Replace destinationCACertificate with the signing CA (not a server cert).
 authProxy:
   tls:
-    secretName: openshell-dashboard-proxy-tls
+    secretName: console-proxy-tls
 openshiftRoute:
   enabled: true
   host: dashboard.apps.example.com

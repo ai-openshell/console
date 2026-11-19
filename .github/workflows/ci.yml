@@ -33,7 +33,7 @@ jobs:
       - name: Render and lint all chart overlays
         run: make helm-lint
       - name: Package chart
-        run: helm package deploy/helm/openshell-dashboard --version 0.0.0-dev --app-version sha-test --destination "$RUNNER_TEMP"
+        run: helm package deploy/helm/console --version 0.0.0-dev --app-version sha-test --destination "$RUNNER_TEMP"
       - name: Helm unit tests
         run: |
           helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3
@@ -42,7 +42,7 @@ jobs:
       - name: Generated chart README is current
         run: |
           make helm-docs
-          git diff --exit-code -- deploy/helm/openshell-dashboard/README.md
+          git diff --exit-code -- deploy/helm/console/README.md
 
   # On a pull request the two check-* jobs do their work only when their half
   # of the tree changed. On a push, to main or to a release branch, they always
@@ -322,7 +322,9 @@ jobs:
   # the job's GitHub OIDC token for a one-hour token of the robot ai-openshell+console_release,
   # which can write quay.io/ai-openshell/console and its chart and nothing
   # else. Quay hands that token out only to the exact subject
-  # repo:ai-openshell/console:environment:release, and the environment admits
+  # repo:ai-openshell@311201172/console@1316331667:environment:release (the
+  # repository uses GitHub's immutable subjects, which carry the owner's and
+  # the repository's IDs; see docs/releasing.md), and the environment admits
   # main and release/** only, so a pull request cannot get it even if it edits
   # this file: its subject is ...:pull_request, which no robot trusts. A pull
   # request gets no image.
@@ -566,10 +568,10 @@ jobs:
         if: steps.tip.outputs.is_tip == 'true'
         run: |
           set -euo pipefail
-          helm package deploy/helm/openshell-dashboard --version 0.0.0-dev \
+          helm package deploy/helm/console --version 0.0.0-dev \
             --app-version "sha-${GITHUB_SHA::7}" --destination "$RUNNER_TEMP"
-          helm push "$RUNNER_TEMP/openshell-dashboard-0.0.0-dev.tgz" \
-            "oci://quay.io/${GITHUB_REPOSITORY,,}/helm-chart"
+          helm push "$RUNNER_TEMP/console-0.0.0-dev.tgz" \
+            "oci://quay.io/ai-openshell/charts"
 
   # The release pipeline (publish.yml, scripts/release/) runs for real only on
   # main and on release branches, after a merge. This job is where a mistake in

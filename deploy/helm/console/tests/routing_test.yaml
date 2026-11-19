@@ -8,7 +8,7 @@ templates:
   - templates/deployment.yaml
   - templates/networkpolicy.yaml
 release:
-  name: openshell-dashboard
+  name: console
   namespace: tenant-a
 set:
   oidc.issuer: https://idp.example.com/realms/openshell
@@ -51,7 +51,7 @@ tests:
           value: dashboard.example.com
       - equal:
           path: spec.to.name
-          value: openshell-dashboard
+          value: console
       - equal:
           path: spec.tls.insecureEdgeTerminationPolicy
           value: Redirect

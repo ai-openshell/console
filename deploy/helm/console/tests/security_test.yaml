@@ -16,16 +16,16 @@ tests:
     asserts:
       - equal:
           path: spec.selector.matchLabels["app.kubernetes.io/name"]
-          value: openshell-dashboard
+          value: console
       - equal:
           path: spec.template.metadata.labels["app.kubernetes.io/name"]
-          value: openshell-dashboard
+          value: console
   - it: exposes only proxy port via Service
     template: templates/service.yaml
     asserts:
       - equal:
           path: spec.selector["app.kubernetes.io/name"]
-          value: openshell-dashboard
+          value: console
       - equal:
           path: spec.ports[0].targetPort
           value: proxy
@@ -92,13 +92,13 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].startupProbe.exec.command
-          value: [/usr/local/bin/openshell-dashboard, --healthcheck]
+          value: [/usr/local/bin/console, --healthcheck]
       - equal:
           path: spec.template.spec.containers[0].livenessProbe.exec.command
-          value: [/usr/local/bin/openshell-dashboard, --healthcheck]
+          value: [/usr/local/bin/console, --healthcheck]
       - equal:
           path: spec.template.spec.containers[0].readinessProbe.exec.command
-          value: [/usr/local/bin/openshell-dashboard, --healthcheck]
+          value: [/usr/local/bin/console, --healthcheck]
       - equal:
           path: spec.template.spec.containers[0].readinessProbe.timeoutSeconds
           value: 3
@@ -226,7 +226,7 @@ tests:
           content: --cookie-name=_openshell_a
       - notContains:
           path: spec.template.spec.containers[1].args
-          content: --client-id=openshell-dashboard
+          content: --client-id=console
       - contains:
           path: spec.template.spec.containers[1].env
           content:
@@ -247,7 +247,7 @@ tests:
     asserts:
       - equal:
           path: spec.podSelector.matchLabels["app.kubernetes.io/name"]
-          value: openshell-dashboard
+          value: console
       - equal:
           path: spec.ingress[0].ports[0].port
           value: 4180

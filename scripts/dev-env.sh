@@ -40,7 +40,7 @@ STATE="$DEV_STATE_DIR"
 # that is in use, and does not replace this one's containers. The name comes
 # from the checkout's path: `reset` before the checkout is deleted or moved,
 # or the gateway's data and its sandboxes stay in Docker under this name.
-PROJECT="openshell-dashboard-dev-$(printf '%s' "$ROOT" | cksum | cut -d' ' -f1)"
+PROJECT="console-dev-$(printf '%s' "$ROOT" | cksum | cut -d' ' -f1)"
 
 # The gateway marks the containers and volumes of its sandboxes with this
 # label, and treats everything that carries it as its own: when it starts, it
@@ -61,7 +61,7 @@ BFF_PORT="${PORT:-8080}" # the BFF reads PORT itself
 # What deploy/keycloak/openshell-realm.json calls its realm and the
 # dashboard's client. prepare_sign_in stops when the file says otherwise.
 REALM_NAME=openshell
-CLIENT_ID=openshell-dashboard
+CLIENT_ID=console
 
 export DEV_GATEWAY_PORT="$GATEWAY_PORT" DEV_HEALTH_PORT="$HEALTH_PORT" \
   DEV_KEYCLOAK_PORT="$KEYCLOAK_PORT" DEV_REALM="$REALM_NAME"
@@ -404,7 +404,7 @@ proxy_binary() {
   need go
   local version bin
   version="$(awk '$1 == "repository:" { ours = ($2 == "oauth2-proxy/oauth2-proxy") } ours && $1 == "tag:" { print $2; exit }' \
-    "$ROOT/deploy/helm/openshell-dashboard/values.yaml")"
+    "$ROOT/deploy/helm/console/values.yaml")"
   case "$version" in
     v[0-9]*) ;;
     *) die "cannot read the oauth2-proxy version from the chart's values.yaml" ;;

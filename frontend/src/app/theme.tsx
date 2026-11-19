@@ -2,7 +2,7 @@ import { createContext, useContext, useState } from 'react';
 
 export type Theme = 'light' | 'dark';
 
-const THEME_STORAGE_KEY = 'openshell-dashboard-theme';
+const THEME_STORAGE_KEY = 'console-theme';
 const DARK_THEME_CLASS = 'pf-v6-theme-dark';
 
 // Storage can throw — blocked site data, some private windows — and the theme

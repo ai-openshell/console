@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { ThemeProvider, useTheme } from '../theme';
 
-const THEME_STORAGE_KEY = 'openshell-dashboard-theme';
+const THEME_STORAGE_KEY = 'console-theme';
 const DARK_THEME_CLASS = 'pf-v6-theme-dark';
 
 // Two surfaces of the kind the provider exists for: the masthead toggle and

@@ -6,7 +6,7 @@ templates:
   - templates/hpa.yaml
   - templates/gateway-preflight.yaml
 release:
-  name: openshell-dashboard
+  name: console
   namespace: tenant-a
 set:
   oidc.issuer: https://idp.example.com/realms/openshell
@@ -32,7 +32,7 @@ tests:
     asserts:
       - equal:
           path: spec.scaleTargetRef.name
-          value: openshell-dashboard
+          value: console
       - equal:
           path: spec.minReplicas
           value: 2

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 OpenShell Dashboard contributors
 # SPDX-License-Identifier: Apache-2.0
 apiVersion: v2
-name: openshell-dashboard
+name: console
 description: OIDC-protected web dashboard for an OpenShell gateway
 type: application
 version: 0.0.0

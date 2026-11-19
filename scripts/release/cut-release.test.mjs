@@ -35,7 +35,7 @@ const gitIdentity = ['-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c'
  * pins to that OpenShell release, which is what decides the line.
  */
 function repository(t, { pinned = '0.1.3' } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'openshell-dashboard-cut-'));
+  const dir = mkdtempSync(join(tmpdir(), 'console-cut-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const origin = join(dir, 'origin.git');
   const work = join(dir, 'work');

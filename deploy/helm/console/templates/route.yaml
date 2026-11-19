@@ -4,9 +4,9 @@ SPDX-License-Identifier: Apache-2.0 */}}
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: {{ include "openshell-dashboard.fullname" . }}
+  name: {{ include "console.fullname" . }}
   labels:
-    {{- include "openshell-dashboard.labels" . | nindent 4 }}
+    {{- include "console.labels" . | nindent 4 }}
   {{- with .Values.openshiftRoute.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -17,7 +17,7 @@ spec:
   {{- end }}
   to:
     kind: Service
-    name: {{ include "openshell-dashboard.fullname" . }}
+    name: {{ include "console.fullname" . }}
   port:
     targetPort: proxy
   tls:

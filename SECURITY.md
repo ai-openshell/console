@@ -21,7 +21,7 @@ This policy covers the OpenShell Dashboard codebase:
 - **React frontend** (`frontend/`) — UI components and API hooks
 - **Container image** — Dockerfile, build pipeline
 - **CI/CD** — GitHub Actions workflows
-- **Helm chart and example files** (`deploy/helm/openshell-dashboard`, `deploy/keycloak`) — the chart is what keeps the auth proxy the only path to the BFF
+- **Helm chart and example files** (`deploy/helm/console`, `deploy/keycloak`) — the chart is what keeps the auth proxy the only path to the BFF
 
 For vulnerabilities in the OpenShell gateway itself, report to the [NVIDIA OpenShell project](https://github.com/NVIDIA/OpenShell) via NVIDIA PSIRT.
 

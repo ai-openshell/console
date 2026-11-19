@@ -8,7 +8,7 @@ templates:
   - templates/gateway.yaml
   - templates/networkpolicy.yaml
 release:
-  name: openshell-dashboard
+  name: console
   namespace: my-namespace
 set:
   oidc.issuer: https://idp.example.com/realms/openshell

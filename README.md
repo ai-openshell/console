@@ -22,8 +22,8 @@ The dashboard is installed with its Helm chart, in the namespace of the gateway 
 Create the Secret the auth proxy reads:
 
 ```sh
-kubectl -n openshell create secret generic openshell-dashboard-oidc \
-  --from-literal=client-secret='<client secret of the openshell-dashboard client>' \
+kubectl -n openshell create secret generic console-oidc \
+  --from-literal=client-secret='<client secret of the console client>' \
   --from-literal=cookie-secret="$(openssl rand -hex 16)"
 ```
 
@@ -55,8 +55,8 @@ networkPolicy:
 Install the chart:
 
 ```sh
-helm upgrade --install openshell-dashboard \
-  oci://quay.io/ai-openshell/console/helm-chart/openshell-dashboard \
+helm upgrade --install console \
+  oci://quay.io/ai-openshell/charts/console \
   --version <dashboard version> --namespace openshell -f values.yaml
 ```
 
@@ -106,7 +106,7 @@ gateway does not return a total count.
 - [Architecture](docs/architecture.md): components, principles, roles
 - [Releasing](docs/releasing.md): how a release is cut and numbered
 - [Decision records](docs/adrs/README.md)
-- [Helm chart](deploy/helm/openshell-dashboard/README.md): every chart value
+- [Helm chart](deploy/helm/console/README.md): every chart value
 
 ## Development
 
