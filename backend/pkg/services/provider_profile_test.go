@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
-	sbv1 "github.com/NVIDIA/OpenShell/sdk/go/proto/sandboxv1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
+	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
+	sbv1 "github.com/ai-openshell/sdk-go/proto/sandboxv1"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ai-openshell/console/backend/pkg/models"

@@ -3,8 +3,8 @@ package clients
 import (
 	"context"
 
-	dm "github.com/NVIDIA/OpenShell/sdk/go/proto/datamodelv1"
-	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
+	dm "github.com/ai-openshell/sdk-go/proto/datamodelv1"
+	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
 )
 
 // ListProviderCredentialKeysAllWorkspaces returns the keys of the credentials

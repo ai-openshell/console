@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/fake"
-	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
+	"github.com/ai-openshell/sdk-go/openshell/v1/fake"
+	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
 
 	"github.com/ai-openshell/console/backend/pkg/auth"
 	"github.com/ai-openshell/console/backend/pkg/models"

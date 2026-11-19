@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
+	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
 
 	"github.com/ai-openshell/console/backend/pkg/models"
 )

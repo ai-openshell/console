@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 
 	"github.com/ai-openshell/console/backend/pkg/apiutils"
 )

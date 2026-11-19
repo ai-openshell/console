@@ -1,6 +1,6 @@
 package services
 
-import openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
+import openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 
 type WorkspaceServiceInterface interface {
 	openshell.WorkspaceInterface

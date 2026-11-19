@@ -3,7 +3,7 @@ package models
 import (
 	"testing"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 )
 
 // The SDK contract (openshell/v1/types/mutations.go) is explicit: only

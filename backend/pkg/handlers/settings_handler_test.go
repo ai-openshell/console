@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 )
 
 // The gateway's settings are typed and the read keeps the type: a bool comes
