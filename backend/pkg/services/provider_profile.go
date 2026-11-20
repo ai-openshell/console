@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
+	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
 
 	"github.com/ai-openshell/console/backend/pkg/models"
 )
@@ -38,13 +38,13 @@ type NarrowProviderProfileStore interface {
 // SDKProviderProfileStore is a ProviderProfileStore over the SDK's profile
 // client.
 //
-// What it reads has narrow endpoints. What it writes is checked first: a
-// profile with an endpoint the SDK could only send in part is refused with
-// models.ErrEndpointNotExpressible instead of being stored without its rules.
-// It cannot protect what it cannot see, though: an update replaces the stored
-// profile, so updating a profile whose stored endpoints say more than a host,
-// a port and a protocol drops the rest. Use clients.RawExecClient wherever
-// profiles are edited.
+// From OpenShell 0.1.9 the SDK's profile endpoint is its policy endpoint and
+// carries an endpoint whole. What it writes is still checked first: a profile
+// with an endpoint that does not survive the SDK's type unchanged is refused
+// with models.ErrEndpointNotExpressible instead of being stored without part of
+// it. It still reports narrow endpoints (EndpointsAreNarrow), and
+// clients/rawprofile.go is still what the app uses, until both are retired in
+// a change of their own.
 type SDKProviderProfileStore struct {
 	profiles openshell.ProfileInterface
 }

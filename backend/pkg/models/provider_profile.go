@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
-	sbv1 "github.com/NVIDIA/OpenShell/sdk/go/proto/sandboxv1"
+	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
+	sbv1 "github.com/ai-openshell/sdk-go/proto/sandboxv1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/durationpb"
 )

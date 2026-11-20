@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/fake"
+	"github.com/ai-openshell/sdk-go/openshell/v1/fake"
 
 	"github.com/ai-openshell/console/backend/pkg/apiutils"
 	"github.com/ai-openshell/console/backend/pkg/auth"

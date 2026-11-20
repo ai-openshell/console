@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 )
 
 // effectivePolicyJSON returns the DTO for config and the JSON object the

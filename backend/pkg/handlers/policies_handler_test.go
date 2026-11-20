@@ -10,9 +10,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	sdktypes "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/types"
 	"github.com/ai-openshell/console/backend/pkg/services"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
+	sdktypes "github.com/ai-openshell/sdk-go/openshell/v1/types"
 )
 
 func policyStatusVersion(opts []openshell.GetStatusOption) uint32 {

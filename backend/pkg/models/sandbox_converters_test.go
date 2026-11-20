@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	"github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/types"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
+	"github.com/ai-openshell/sdk-go/openshell/v1/types"
 )
 
 // fullSDKSandbox is a sandbox with every field the gateway can report set to a

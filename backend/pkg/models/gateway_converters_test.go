@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 )
 
 // Every field of a negotiated extension reaches the frontend, and the kind is

@@ -14,9 +14,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
 	"github.com/ai-openshell/console/backend/pkg/apiutils"
 	"github.com/ai-openshell/console/backend/pkg/services"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 )
 
 // loginShellNoise is what a sandbox under the base policy prints on stderr

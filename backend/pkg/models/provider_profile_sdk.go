@@ -3,10 +3,10 @@ package models
 import (
 	"fmt"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	"github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/types"
-	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
-	sbv1 "github.com/NVIDIA/OpenShell/sdk/go/proto/sandboxv1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
+	"github.com/ai-openshell/sdk-go/openshell/v1/types"
+	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
+	sbv1 "github.com/ai-openshell/sdk-go/proto/sandboxv1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -16,10 +16,12 @@ import (
 // SDK (services.NewSDKProviderProfileStore). The SDK has the same conversion
 // and keeps it internal.
 //
-// Everything of a profile fits the SDK type except its endpoints, of which the
-// SDK carries a host, a port and a protocol. ProviderProfileFromSDK therefore
-// yields endpoints that are known to be incomplete, and ProviderProfileToSDK
-// refuses an endpoint it could only send in part.
+// From OpenShell 0.1.9 the SDK's profile endpoint is its policy endpoint
+// (types.NetworkEndpoint = types.PolicyNetworkEndpoint), so an endpoint is
+// converted with the policy endpoint converters in policyproto.go. Before, the
+// SDK carried only a host, a port and a protocol. ProviderProfileToSDK still
+// refuses an endpoint that does not survive the conversion unchanged, so a
+// field the SDK type lacks is never dropped on the way to the gateway.
 //
 // The one other field the SDK type has no place for is a credential's
 // token_grant_owners (OpenShell 0.1.3). The gateway derives it and ignores a
@@ -30,8 +32,7 @@ import (
 // ErrEndpointNotExpressible is what ProviderProfileToSDK returns for an
 // endpoint that holds more than the SDK's NetworkEndpoint can carry.
 var ErrEndpointNotExpressible = fmt.Errorf(
-	"the profile has an endpoint that sets more than a host, a port and a protocol, " +
-		"which is all this backend can send to the gateway")
+	"the profile has an endpoint that sets a field this backend cannot send to the gateway")
 
 var (
 	sdkProfileCategories = map[openshell.ProfileCategory]pb.ProviderProfileCategory{
@@ -84,7 +85,7 @@ func sdkDurationFromProto(d *durationpb.Duration) *types.ProfileDuration {
 }
 
 // ProviderProfileFromSDK converts a profile read through the SDK to the
-// gateway's message. Its endpoints hold the three fields the SDK carries.
+// gateway's message.
 func ProviderProfileFromSDK(profile *openshell.ProviderProfile) *pb.ProviderProfile {
 	if profile == nil {
 		return nil
@@ -111,11 +112,7 @@ func ProviderProfileFromSDK(profile *openshell.ProviderProfile) *pb.ProviderProf
 		})
 	}
 	for _, endpoint := range profile.Endpoints {
-		out.Endpoints = append(out.Endpoints, &sbv1.NetworkEndpoint{
-			Host:     endpoint.Host,
-			Port:     endpoint.Port,
-			Protocol: endpoint.Protocol,
-		})
+		out.Endpoints = append(out.Endpoints, policyNetworkEndpointToProto(&endpoint))
 	}
 	for _, binary := range profile.Binaries {
 		out.Binaries = append(out.Binaries, &sbv1.NetworkBinary{Path: binary.Path})
@@ -226,19 +223,11 @@ func ProviderProfileToSDK(profile *pb.ProviderProfile) (openshell.ProviderProfil
 		})
 	}
 	for index, endpoint := range profile.GetEndpoints() {
-		narrow := &sbv1.NetworkEndpoint{
-			Host:     endpoint.GetHost(),
-			Port:     endpoint.GetPort(),
-			Protocol: endpoint.GetProtocol(),
-		}
-		if !proto.Equal(narrow, endpoint) {
+		converted := policyNetworkEndpointFromProto(endpoint)
+		if !proto.Equal(policyNetworkEndpointToProto(&converted), endpoint) {
 			return openshell.ProviderProfile{}, fmt.Errorf("endpoints[%d]: %w", index, ErrEndpointNotExpressible)
 		}
-		out.Endpoints = append(out.Endpoints, openshell.NetworkEndpoint{
-			Host:     narrow.GetHost(),
-			Port:     narrow.GetPort(),
-			Protocol: narrow.GetProtocol(),
-		})
+		out.Endpoints = append(out.Endpoints, converted)
 	}
 	for _, binary := range profile.GetBinaries() {
 		out.Binaries = append(out.Binaries, openshell.NetworkBinary{Path: binary.GetPath()})

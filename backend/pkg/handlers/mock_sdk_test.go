@@ -5,9 +5,9 @@ import (
 	"io"
 	"sync"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	"github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/types"
-	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
+	"github.com/ai-openshell/sdk-go/openshell/v1/types"
+	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
 	"google.golang.org/grpc"
 )
 
@@ -34,8 +34,11 @@ func (m *mockSDK) Health() openshell.HealthInterface      { return &m.health }
 func (m *mockSDK) SandboxSuspendResume() openshell.SandboxSuspendResumeInterface {
 	panic("not implemented")
 }
-func (m *mockSDK) SSH() openshell.SSHInterface              { panic("not implemented") }
-func (m *mockSDK) TCP() openshell.TCPInterface              { panic("not implemented") }
+func (m *mockSDK) SSH() openshell.SSHInterface { panic("not implemented") }
+func (m *mockSDK) TCP() openshell.TCPInterface { panic("not implemented") }
+func (m *mockSDK) SandboxLogsWatch() openshell.SandboxLogsWatchInterface {
+	panic("not implemented")
+}
 func (m *mockSDK) Config() openshell.ConfigInterface        { return &m.config }
 func (m *mockSDK) Policy() openshell.PolicyInterface        { return &m.policy }
 func (m *mockSDK) Workspaces() openshell.WorkspaceInterface { return &m.workspaces }

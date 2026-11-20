@@ -5,8 +5,8 @@ import (
 	"errors"
 	"slices"
 
-	dm "github.com/NVIDIA/OpenShell/sdk/go/proto/datamodelv1"
-	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
+	dm "github.com/ai-openshell/sdk-go/proto/datamodelv1"
+	pb "github.com/ai-openshell/sdk-go/proto/openshellv1"
 )
 
 // The methods in this file read which credentials a provider holds, which the

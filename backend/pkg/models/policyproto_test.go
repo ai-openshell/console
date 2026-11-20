@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	sbv1 "github.com/NVIDIA/OpenShell/sdk/go/proto/sandboxv1"
+	sbv1 "github.com/ai-openshell/sdk-go/proto/sandboxv1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"

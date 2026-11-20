@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/ai-openshell/console/backend/pkg/services"

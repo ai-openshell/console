@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	"github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/fake"
-	"github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
-	"github.com/NVIDIA/OpenShell/sdk/go/proto/optionsv1"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
+	"github.com/ai-openshell/sdk-go/openshell/v1/fake"
+	"github.com/ai-openshell/sdk-go/proto/openshellv1"
+	"github.com/ai-openshell/sdk-go/proto/optionsv1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
