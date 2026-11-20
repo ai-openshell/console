@@ -92,13 +92,22 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].startupProbe.exec.command
-          value: [/usr/local/bin/console, --healthcheck]
+          value: ['/bin/sh', '-c', 'if [ -x /usr/local/bin/console ]; then exec /usr/local/bin/console --healthcheck; elif [ -x /usr/local/bin/openshell-dashboard ]; then exec /usr/local/bin/openshell-dashboard --healthcheck; else echo console-healthcheck-binary-not-found >&2; exit 127; fi']
       - equal:
           path: spec.template.spec.containers[0].livenessProbe.exec.command
-          value: [/usr/local/bin/console, --healthcheck]
+          value: ['/bin/sh', '-c', 'if [ -x /usr/local/bin/console ]; then exec /usr/local/bin/console --healthcheck; elif [ -x /usr/local/bin/openshell-dashboard ]; then exec /usr/local/bin/openshell-dashboard --healthcheck; else echo console-healthcheck-binary-not-found >&2; exit 127; fi']
       - equal:
           path: spec.template.spec.containers[0].readinessProbe.exec.command
-          value: [/usr/local/bin/console, --healthcheck]
+          value: ['/bin/sh', '-c', 'if [ -x /usr/local/bin/console ]; then exec /usr/local/bin/console --healthcheck; elif [ -x /usr/local/bin/openshell-dashboard ]; then exec /usr/local/bin/openshell-dashboard --healthcheck; else echo console-healthcheck-binary-not-found >&2; exit 127; fi']
+      - matchRegex:
+          path: spec.template.spec.containers[0].startupProbe.exec.command[2]
+          pattern: \[ -x /usr/local/bin/openshell-dashboard \]
+      - matchRegex:
+          path: spec.template.spec.containers[0].livenessProbe.exec.command[2]
+          pattern: \[ -x /usr/local/bin/openshell-dashboard \]
+      - matchRegex:
+          path: spec.template.spec.containers[0].readinessProbe.exec.command[2]
+          pattern: \[ -x /usr/local/bin/openshell-dashboard \]
       - equal:
           path: spec.template.spec.containers[0].readinessProbe.timeoutSeconds
           value: 3

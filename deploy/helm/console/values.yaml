@@ -165,21 +165,21 @@ oidc:
 probes:
   startup:
     # -- Dashboard exec command; the default calls the BFF's loopback self-check.
-    dashboardCommand: [/usr/local/bin/console, --healthcheck]
+    dashboardCommand: ['/bin/sh', '-c', 'if [ -x /usr/local/bin/console ]; then exec /usr/local/bin/console --healthcheck; elif [ -x /usr/local/bin/openshell-dashboard ]; then exec /usr/local/bin/openshell-dashboard --healthcheck; else echo console-healthcheck-binary-not-found >&2; exit 127; fi']
     # -- Startup probe failure threshold (dashboard and proxy).
     failureThreshold: 30
     # -- Startup probe period in seconds.
     periodSeconds: 2
   liveness:
     # -- Dashboard exec command for liveness.
-    dashboardCommand: [/usr/local/bin/console, --healthcheck]
+    dashboardCommand: ['/bin/sh', '-c', 'if [ -x /usr/local/bin/console ]; then exec /usr/local/bin/console --healthcheck; elif [ -x /usr/local/bin/openshell-dashboard ]; then exec /usr/local/bin/openshell-dashboard --healthcheck; else echo console-healthcheck-binary-not-found >&2; exit 127; fi']
     # -- Liveness probe period in seconds.
     periodSeconds: 10
     # -- Liveness probe failure threshold.
     failureThreshold: 3
   readiness:
     # -- Dashboard exec command for readiness.
-    dashboardCommand: [/usr/local/bin/console, --healthcheck]
+    dashboardCommand: ['/bin/sh', '-c', 'if [ -x /usr/local/bin/console ]; then exec /usr/local/bin/console --healthcheck; elif [ -x /usr/local/bin/openshell-dashboard ]; then exec /usr/local/bin/openshell-dashboard --healthcheck; else echo console-healthcheck-binary-not-found >&2; exit 127; fi']
     # -- Readiness probe period in seconds.
     periodSeconds: 5
     # -- Readiness probe failure threshold.

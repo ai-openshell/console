@@ -93,7 +93,7 @@ These files are in the repository, not in the packaged chart. CI renders each on
 - **Versions and images**
   - The chart version is the dashboard image version, and a published version is never replaced. A checkout of the chart is version `0.0.0`, for which there is no image.
   - Pin an image with `dashboard.image.digest` or `authProxy.image.digest`. For a registry mirror, set `global.image.registry` and each `repository`.
-  - The dashboard's probes run `probes.*.dashboardCommand`; the default is the binary's own `--healthcheck`.
+  - The dashboard's probes run `probes.*.dashboardCommand`; the default finds `/usr/local/bin/console`, falls back to `/usr/local/bin/openshell-dashboard`, and runs the binary's own `--healthcheck`. An image with another binary sets `probes.*.dashboardCommand`.
 
 ## Values
 {{ template "chart.valuesSection" . }}

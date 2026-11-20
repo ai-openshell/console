@@ -93,7 +93,7 @@ These files are in the repository, not in the packaged chart. CI renders each on
 - **Versions and images**
   - The chart version is the dashboard image version, and a published version is never replaced. A checkout of the chart is version `0.0.0`, for which there is no image.
   - Pin an image with `dashboard.image.digest` or `authProxy.image.digest`. For a registry mirror, set `global.image.registry` and each `repository`.
-  - The dashboard's probes run `probes.*.dashboardCommand`; the default is the binary's own `--healthcheck`.
+  - The dashboard's probes run `probes.*.dashboardCommand`; the default finds `/usr/local/bin/console`, falls back to `/usr/local/bin/openshell-dashboard`, and runs the binary's own `--healthcheck`. An image with another binary sets `probes.*.dashboardCommand`.
 
 ## Values
 ## Values
@@ -183,13 +183,13 @@ These files are in the repository, not in the packaged chart. CI renders each on
 | podLabels | object | `{}` | Extra pod labels; cannot override identity/instance selector labels. |
 | podLifecycle.terminationGracePeriodSeconds | int | `30` | Pod termination grace period in seconds. |
 | podSecurityContext.fsGroup | int | `1000` | fsGroup of the pod; on OpenShift set podSecurityContext to null. |
-| probes.liveness.dashboardCommand | list | `["/usr/local/bin/console","--healthcheck"]` | Dashboard exec command for liveness. |
+| probes.liveness.dashboardCommand | list | `["/bin/sh","-c","if [ -x /usr/local/bin/console ]; then exec /usr/local/bin/console --healthcheck; elif [ -x /usr/local/bin/openshell-dashboard ]; then exec /usr/local/bin/openshell-dashboard --healthcheck; else echo console-healthcheck-binary-not-found >&2; exit 127; fi"]` | Dashboard exec command for liveness. |
 | probes.liveness.failureThreshold | int | `3` | Liveness probe failure threshold. |
 | probes.liveness.periodSeconds | int | `10` | Liveness probe period in seconds. |
-| probes.readiness.dashboardCommand | list | `["/usr/local/bin/console","--healthcheck"]` | Dashboard exec command for readiness. |
+| probes.readiness.dashboardCommand | list | `["/bin/sh","-c","if [ -x /usr/local/bin/console ]; then exec /usr/local/bin/console --healthcheck; elif [ -x /usr/local/bin/openshell-dashboard ]; then exec /usr/local/bin/openshell-dashboard --healthcheck; else echo console-healthcheck-binary-not-found >&2; exit 127; fi"]` | Dashboard exec command for readiness. |
 | probes.readiness.failureThreshold | int | `3` | Readiness probe failure threshold. |
 | probes.readiness.periodSeconds | int | `5` | Readiness probe period in seconds. |
-| probes.startup.dashboardCommand | list | `["/usr/local/bin/console","--healthcheck"]` | Dashboard exec command; the default calls the BFF's loopback self-check. |
+| probes.startup.dashboardCommand | list | `["/bin/sh","-c","if [ -x /usr/local/bin/console ]; then exec /usr/local/bin/console --healthcheck; elif [ -x /usr/local/bin/openshell-dashboard ]; then exec /usr/local/bin/openshell-dashboard --healthcheck; else echo console-healthcheck-binary-not-found >&2; exit 127; fi"]` | Dashboard exec command; the default calls the BFF's loopback self-check. |
 | probes.startup.failureThreshold | int | `30` | Startup probe failure threshold (dashboard and proxy). |
 | probes.startup.periodSeconds | int | `2` | Startup probe period in seconds. |
 | replicaCount | int | `1` | Number of stateless dashboard pods (ignored when autoscaling is enabled). |
