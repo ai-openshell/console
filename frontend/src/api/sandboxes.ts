@@ -101,6 +101,31 @@ export const startSandbox = (
     `/api/v1/workspaces/${encodeURIComponent(workspace)}/sandboxes/${encodeURIComponent(name)}/start`,
   );
 
+export const suspendSandbox = (
+  workspace: string,
+  name: string,
+): Promise<Sandbox> =>
+  post<Sandbox>(
+    `/api/v1/workspaces/${encodeURIComponent(workspace)}/sandboxes/${encodeURIComponent(name)}/suspend`,
+  );
+
+// ResumeSandboxRequest.restart_if_restore_fails: whether the sandbox may boot
+// cleanly when its memory state cannot be restored. Left out, a resume that
+// cannot restore fails and the sandbox stays suspended.
+export type ResumeSandboxOptions = {
+  restartIfRestoreFails?: boolean;
+};
+
+export const resumeSandbox = (
+  workspace: string,
+  name: string,
+  options?: ResumeSandboxOptions,
+): Promise<Sandbox> =>
+  post<Sandbox>(
+    `/api/v1/workspaces/${encodeURIComponent(workspace)}/sandboxes/${encodeURIComponent(name)}/resume`,
+    options,
+  );
+
 export const useSandboxes = (workspace: string, labelSelector?: string) =>
   useQuery({
     queryKey: sandboxKeys.list(workspace, labelSelector),
@@ -314,6 +339,26 @@ export const useStartSandbox = (workspace: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (name: string) => startSandbox(workspace, name),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: sandboxKeys.scope(workspace) }),
+  });
+};
+
+export const useSuspendSandbox = (workspace: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => suspendSandbox(workspace, name),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: sandboxKeys.scope(workspace) }),
+  });
+};
+
+// Resumes the way `openshell sandbox resume` does: from the memory state the
+// sandbox kept, and not at all when that cannot be restored.
+export const useResumeSandbox = (workspace: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => resumeSandbox(workspace, name),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: sandboxKeys.scope(workspace) }),
   });

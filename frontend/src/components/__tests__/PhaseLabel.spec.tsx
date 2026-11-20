@@ -15,6 +15,8 @@ describe('PhaseLabel', () => {
     ['STOPPED'],
     ['STARTING'],
     ['COMPLETED'],
+    ['SUSPENDING'],
+    ['SUSPENDED'],
     ['UNKNOWN'],
     ['UNSPECIFIED'],
   ])('renders %s phase with correct text', (phase) => {
@@ -63,6 +65,34 @@ describe('PhaseLabel', () => {
     expect(colorOf(<PhaseLabel phase="STOPPED" />)).not.toBe(
       colorOf(<PhaseLabel phase="READY" />),
     );
+  });
+
+  // As `openshell sandbox list` colors them: a suspend under way like any
+  // other work in progress, a suspended sandbox at rest.
+  it('shows SUSPENDING as work in progress', () => {
+    expect(colorOf(<PhaseLabel phase="SUSPENDING" />)).toBe(
+      colorOf(<PhaseLabel phase="STOPPING" />),
+    );
+  });
+
+  it('shows SUSPENDED as a sandbox at rest, with an icon of its own', () => {
+    expect(colorOf(<PhaseLabel phase="SUSPENDED" />)).toBe(
+      colorOf(<PhaseLabel phase="STOPPED" />),
+    );
+    expect(colorOf(<PhaseLabel phase="SUSPENDED" />)).not.toBe(
+      colorOf(<PhaseLabel phase="ERROR" />),
+    );
+    const iconOf = (ui: React.ReactElement): string => {
+      const { container, unmount } = render(ui);
+      const icon = container.querySelector('.pf-v6-c-label__icon')?.innerHTML;
+      unmount();
+      return icon ?? '';
+    };
+    const suspended = iconOf(<PhaseLabel phase="SUSPENDED" />);
+    expect(suspended).not.toBe('');
+    // Not the bare grey label of a phase this build does not know.
+    expect(iconOf(<PhaseLabel phase="UNKNOWN" />)).toBe('');
+    expect(suspended).not.toBe(iconOf(<PhaseLabel phase="STOPPED" />));
   });
 
   it('ignores an exit code on a phase it does not change', () => {

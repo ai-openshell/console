@@ -20,8 +20,12 @@ type SandboxLogStream interface {
 	Recv() (*pb.SandboxStreamEvent, error)
 }
 
+// SandboxServiceInterface is the SDK's sandbox sub-client, its suspend and
+// resume sub-client (a separate interface in the SDK, on the same client) and
+// the raw log watch.
 type SandboxServiceInterface interface {
 	openshell.SandboxInterface
+	openshell.SandboxSuspendResumeInterface
 	WatchSandboxLogs(
 		ctx context.Context,
 		workspace string,
@@ -34,11 +38,12 @@ type SandboxServiceInterface interface {
 
 type SandboxService struct {
 	openshell.SandboxInterface
+	openshell.SandboxSuspendResumeInterface
 	rawExec SandboxRawExec
 }
 
-func NewSandboxService(client openshell.SandboxInterface, rawExecClient SandboxRawExec) SandboxServiceInterface {
-	return &SandboxService{SandboxInterface: client, rawExec: rawExecClient}
+func NewSandboxService(client openshell.SandboxInterface, suspendResume openshell.SandboxSuspendResumeInterface, rawExecClient SandboxRawExec) SandboxServiceInterface {
+	return &SandboxService{SandboxInterface: client, SandboxSuspendResumeInterface: suspendResume, rawExec: rawExecClient}
 }
 
 func (s *SandboxService) WatchSandboxLogs(ctx context.Context, workspace string, sandbox string, logTailLines uint32, logSources []string, logMinLevel string) (SandboxLogStream, error) {

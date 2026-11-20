@@ -31,6 +31,8 @@ const mockDeleteMutate = jest.fn((_name: string, options?: MutateOptions) => {
 const mockDeleteReset = jest.fn();
 const mockStartMutate = jest.fn();
 const mockStopMutate = jest.fn();
+const mockSuspendMutate = jest.fn();
+const mockResumeMutate = jest.fn();
 
 jest.mock('../../api/sandboxes', () => ({
   useSandbox: jest.fn(),
@@ -39,6 +41,14 @@ jest.mock('../../api/sandboxes', () => ({
     isPending: false,
   })),
   useStopSandbox: jest.fn(() => ({ mutate: mockStopMutate, isPending: false })),
+  useSuspendSandbox: jest.fn(() => ({
+    mutate: mockSuspendMutate,
+    isPending: false,
+  })),
+  useResumeSandbox: jest.fn(() => ({
+    mutate: mockResumeMutate,
+    isPending: false,
+  })),
   useDeleteSandbox: jest.fn(() => ({
     mutate: mockDeleteMutate,
     reset: mockDeleteReset,
@@ -56,11 +66,12 @@ jest.mock('../../api/providers', () => ({
 }));
 
 const mockAddAlert = jest.fn();
+const mockAddDanger = jest.fn();
 jest.mock('../../app/AlertContext', () => ({
   useAlerts: jest.fn(() => ({
     addAlert: mockAddAlert,
     addSuccess: jest.fn(),
-    addDanger: jest.fn(),
+    addDanger: mockAddDanger,
   })),
 }));
 
@@ -195,8 +206,29 @@ describe('SandboxDetailPage header', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('offers a start, and no stop, for a completed sandbox', () => {
+    // Gateway 0.1.9 accepts a start of a completed sandbox, and with the
+    // Docker driver that start fails and leaves the sandbox in ERROR. A stop,
+    // then a start, runs it again.
+    it('offers a stop, and no start, for a completed sandbox', () => {
       renderPage(makeSandbox({ phase: 'COMPLETED', exitCode: 0 }));
+      expect(
+        screen.queryByTestId('sandbox-start-button'),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('sandbox-stop-button'));
+      expect(mockStopMutate).toHaveBeenCalledWith('agent-1', expect.anything());
+    });
+
+    it('offers a stop for a sandbox in ERROR, which a start can follow', () => {
+      renderPage(makeSandbox({ phase: 'ERROR', exitCode: 3 }));
+      expect(
+        screen.queryByTestId('sandbox-start-button'),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('sandbox-stop-button'));
+      expect(mockStopMutate).toHaveBeenCalledWith('agent-1', expect.anything());
+    });
+
+    it('offers a start for a stopped sandbox', () => {
+      renderPage(makeSandbox({ phase: 'STOPPED' }));
       expect(
         screen.queryByTestId('sandbox-stop-button'),
       ).not.toBeInTheDocument();
@@ -207,17 +239,104 @@ describe('SandboxDetailPage header', () => {
       );
     });
 
-    it('offers a start for a stopped sandbox', () => {
-      renderPage(makeSandbox({ phase: 'STOPPED' }));
-      expect(screen.getByTestId('sandbox-start-button')).toBeEnabled();
-    });
-
     it('offers neither while the sandbox is provisioning', () => {
       renderPage(makeSandbox({ phase: 'PROVISIONING' }));
       expect(
         screen.queryByTestId('sandbox-start-button'),
       ).not.toBeInTheDocument();
       expect(screen.getByTestId('sandbox-stop-button')).toBeDisabled();
+    });
+  });
+
+  describe('suspend and resume', () => {
+    it('offers a suspend beside the stop of a ready sandbox', () => {
+      renderPage();
+      expect(screen.getByTestId('sandbox-stop-button')).toBeEnabled();
+      expect(
+        screen.queryByTestId('sandbox-resume-button'),
+      ).not.toBeInTheDocument();
+      const suspend = screen.getByTestId('sandbox-suspend-button');
+      expect(suspend).toHaveTextContent('Suspend');
+      fireEvent.click(suspend);
+      expect(mockSuspendMutate).toHaveBeenCalledWith(
+        'agent-1',
+        expect.anything(),
+      );
+    });
+
+    it('shows a suspended sandbox as suspended and offers a resume', () => {
+      renderPage(makeSandbox({ phase: 'SUSPENDED' }));
+      expect(screen.getByTestId('phase-label')).toHaveTextContent('SUSPENDED');
+      expect(
+        screen.queryByTestId('sandbox-suspend-button'),
+      ).not.toBeInTheDocument();
+      const resume = screen.getByTestId('sandbox-resume-button');
+      expect(resume).toHaveTextContent('Resume');
+      fireEvent.click(resume);
+      expect(mockResumeMutate).toHaveBeenCalledWith(
+        'agent-1',
+        expect.anything(),
+      );
+    });
+
+    // A start would boot it afresh and discard what the resume restores; a
+    // stop says that it ends the sandbox's run.
+    it('offers a stop, and no start, for a suspended sandbox', () => {
+      renderPage(makeSandbox({ phase: 'SUSPENDED' }));
+      expect(
+        screen.queryByTestId('sandbox-start-button'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('sandbox-stop-button')).toBeEnabled();
+    });
+
+    it('offers a stop, and nothing else, while a suspend is under way', () => {
+      renderPage(makeSandbox({ phase: 'SUSPENDING' }));
+      expect(screen.getByTestId('sandbox-stop-button')).toBeEnabled();
+      for (const action of ['suspend', 'resume', 'start']) {
+        expect(
+          screen.queryByTestId(`sandbox-${action}-button`),
+        ).not.toBeInTheDocument();
+      }
+    });
+
+    it.each(['STOPPED', 'COMPLETED', 'ERROR', 'PROVISIONING'] as const)(
+      'offers neither for a sandbox that is %s',
+      (phase) => {
+        renderPage(makeSandbox({ phase }));
+        expect(
+          screen.queryByTestId('sandbox-suspend-button'),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId('sandbox-resume-button'),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    // What every compute driver upstream ships at 0.1.9 answers.
+    it("shows the gateway's refusal of a suspend", () => {
+      mockSuspendMutate.mockImplementationOnce(
+        (_name: string, options: { onError: (err: Error) => void }) =>
+          options.onError(
+            new Error('compute driver does not support sandbox suspend'),
+          ),
+      );
+      renderPage();
+      fireEvent.click(screen.getByTestId('sandbox-suspend-button'));
+      expect(mockAddDanger).toHaveBeenCalledWith(
+        'Failed to suspend sandbox agent-1: compute driver does not support sandbox suspend',
+      );
+    });
+
+    it("shows the gateway's refusal of a resume", () => {
+      mockResumeMutate.mockImplementationOnce(
+        (_name: string, options: { onError: (err: Error) => void }) =>
+          options.onError(new Error('restore failed')),
+      );
+      renderPage(makeSandbox({ phase: 'SUSPENDED' }));
+      fireEvent.click(screen.getByTestId('sandbox-resume-button'));
+      expect(mockAddDanger).toHaveBeenCalledWith(
+        'Failed to resume sandbox agent-1: restore failed',
+      );
     });
   });
 

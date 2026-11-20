@@ -25,7 +25,7 @@ import (
 // them, with the sandbox service app.go gives the handler.
 func draftSummaryRoutes(sdk *mockSDK) http.Handler {
 	handler := NewDraftsHandler(services.NewPolicyService(sdk.Policy()))
-	handler.SetSandboxService(services.NewSandboxService(sdk.Sandboxes(), nil))
+	handler.SetSandboxService(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 	r := chi.NewRouter()
 	r.Get("/draft-summary", handler.GetDraftSummary)
 	r.Get("/workspaces/{workspace}/draft-summary", handler.GetWorkspaceDraftSummary)

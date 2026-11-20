@@ -8,6 +8,7 @@ import (
 	"github.com/ai-openshell/console/backend/pkg/apiutils"
 	"github.com/ai-openshell/console/backend/pkg/models"
 	"github.com/ai-openshell/console/backend/pkg/services"
+	openshell "github.com/ai-openshell/sdk-go/openshell/v1"
 )
 
 type SandboxHandler struct {
@@ -118,9 +119,10 @@ func (h *SandboxHandler) GetSandbox(w http.ResponseWriter, r *http.Request) {
 	apiutils.WriteJSON(w, http.StatusOK, models.FromSDKSandbox(sandbox))
 }
 
-// StopSandbox stops a running sandbox while retaining its persistent state.
-// The sandbox transitions through STOPPING to STOPPED and can be resumed with
-// StartSandbox.
+// StopSandbox stops a sandbox while retaining its persistent state. The
+// sandbox transitions through STOPPING to STOPPED and StartSandbox boots it
+// again. The gateway takes a stop of a sandbox whose main process has exited
+// (COMPLETED, ERROR) and of a suspended one too.
 func (h *SandboxHandler) StopSandbox(w http.ResponseWriter, r *http.Request) {
 	sandbox, err := h.svc.Stop(r.Context(), r.PathValue("workspace"), r.PathValue("name"))
 	if err != nil {
@@ -130,10 +132,48 @@ func (h *SandboxHandler) StopSandbox(w http.ResponseWriter, r *http.Request) {
 	apiutils.WriteJSON(w, http.StatusOK, models.FromSDKSandbox(sandbox))
 }
 
-// StartSandbox resumes a previously stopped sandbox. The sandbox transitions
-// through STARTING back to READY.
+// StartSandbox boots a previously stopped sandbox again. The sandbox
+// transitions through STARTING back to READY.
 func (h *SandboxHandler) StartSandbox(w http.ResponseWriter, r *http.Request) {
 	sandbox, err := h.svc.Start(r.Context(), r.PathValue("workspace"), r.PathValue("name"))
+	if err != nil {
+		apiutils.WriteSDKError(w, err)
+		return
+	}
+	apiutils.WriteJSON(w, http.StatusOK, models.FromSDKSandbox(sandbox))
+}
+
+// SuspendSandbox freezes a ready sandbox and keeps its memory state. The
+// sandbox goes through SUSPENDING to SUSPENDED, and ResumeSandbox restores it.
+// The gateway refuses it (a 409 here) when its compute driver does not
+// support suspend, and for a sandbox that is not READY.
+func (h *SandboxHandler) SuspendSandbox(w http.ResponseWriter, r *http.Request) {
+	sandbox, err := h.svc.Suspend(r.Context(), r.PathValue("workspace"), r.PathValue("name"))
+	if err != nil {
+		apiutils.WriteSDKError(w, err)
+		return
+	}
+	apiutils.WriteJSON(w, http.StatusOK, models.FromSDKSandbox(sandbox))
+}
+
+// ResumeSandboxRequest is the body of a resume. It mirrors
+// ResumeSandboxRequest.restart_if_restore_fails: whether the sandbox may boot
+// cleanly when its memory state cannot be restored. Without it, or without a
+// body, a resume that cannot restore fails, which is what the OpenShell CLI's
+// `sandbox resume` asks for.
+type ResumeSandboxRequest struct {
+	RestartIfRestoreFails bool `json:"restartIfRestoreFails,omitempty"`
+}
+
+// ResumeSandbox restores a suspended sandbox from its memory state. The
+// sandbox goes through STARTING back to READY.
+func (h *SandboxHandler) ResumeSandbox(w http.ResponseWriter, r *http.Request) {
+	var body ResumeSandboxRequest
+	if r.ContentLength != 0 && !apiutils.DecodeBody(w, r, &body) {
+		return
+	}
+	sandbox, err := h.svc.Resume(r.Context(), r.PathValue("workspace"), r.PathValue("name"),
+		openshell.ResumeOptions{RestartIfRestoreFails: body.RestartIfRestoreFails})
 	if err != nil {
 		apiutils.WriteSDKError(w, err)
 		return

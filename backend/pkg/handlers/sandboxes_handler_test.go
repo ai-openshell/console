@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -51,7 +53,7 @@ func TestListSandboxes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sdk := &mockSDK{}
 			sdk.sandboxes.listFn = tc.listFn
-			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 			r := chi.NewRouter()
 			r.Get("/workspaces/{workspace}/sandboxes", handler.ListSandboxes)
 
@@ -78,7 +80,7 @@ func TestListSandboxesBody(t *testing.T) {
 			},
 		}, nil
 	}
-	handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+	handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes", handler.ListSandboxes)
 
@@ -180,7 +182,7 @@ func TestCreateSandbox(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sdk := &mockSDK{}
 			sdk.sandboxes.createFn = tc.createFn
-			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 			r := chi.NewRouter()
 			r.Post("/workspaces/{workspace}/sandboxes", handler.CreateSandbox)
 
@@ -226,7 +228,7 @@ func postSandbox(t *testing.T, body string, createErr error) (*httptest.Response
 			ServiceURLs: map[string]string{"": "https://sandbox.example.test"},
 		}, nil
 	}
-	handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+	handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 	r := chi.NewRouter()
 	r.Post("/workspaces/{workspace}/sandboxes", handler.CreateSandbox)
 
@@ -356,7 +358,7 @@ func TestCreateSandboxWithoutImage(t *testing.T) {
 				resolved.Template = &openshell.SandboxTemplate{Image: defaultImage}
 				return &openshell.Sandbox{Name: name, Spec: resolved}, nil
 			}
-			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 			r := chi.NewRouter()
 			r.Post("/workspaces/{workspace}/sandboxes", handler.CreateSandbox)
 
@@ -471,7 +473,7 @@ func TestGetSandboxBody(t *testing.T) {
 			},
 		}, nil
 	}
-	handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+	handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes/{name}", handler.GetSandbox)
 
@@ -538,7 +540,7 @@ func TestGetSandbox(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sdk := &mockSDK{}
 			sdk.sandboxes.getFn = tc.getFn
-			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 			r := chi.NewRouter()
 			r.Get("/workspaces/{workspace}/sandboxes/{name}", handler.GetSandbox)
 
@@ -585,7 +587,7 @@ func TestStopSandbox(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sdk := &mockSDK{}
 			sdk.sandboxes.stopFn = tc.stopFn
-			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 			r := chi.NewRouter()
 			r.Post("/workspaces/{workspace}/sandboxes/{name}/stop", handler.StopSandbox)
 
@@ -595,6 +597,145 @@ func TestStopSandbox(t *testing.T) {
 
 			if w.Code != tc.wantStatus {
 				t.Errorf("status = %d, want %d; body: %s", w.Code, tc.wantStatus, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestSuspendSandbox(t *testing.T) {
+	tests := []struct {
+		suspendFn  func(ctx context.Context, workspace, name string) (*openshell.Sandbox, error)
+		name       string
+		wantPhase  string
+		wantStatus int
+	}{
+		{
+			name: "success",
+			suspendFn: func(_ context.Context, workspace, name string) (*openshell.Sandbox, error) {
+				if workspace != "team-a" || name != "my-sandbox" {
+					return nil, fmt.Errorf("suspend asked for %s/%s", workspace, name)
+				}
+				return &openshell.Sandbox{ID: "id-1", Name: name, Status: openshell.SandboxStatus{Phase: openshell.SandboxSuspending}}, nil
+			},
+			wantStatus: http.StatusOK,
+			wantPhase:  "SUSPENDING",
+		},
+		{
+			name: "not found",
+			suspendFn: func(_ context.Context, _, _ string) (*openshell.Sandbox, error) {
+				return nil, &openshell.StatusError{Code: openshell.ErrorNotFound, Message: "sandbox not found"}
+			},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			// What a gateway on a compute driver without suspend answers:
+			// FailedPrecondition, which the SDK reads as a conflict.
+			name: "driver without suspend conflicts",
+			suspendFn: func(_ context.Context, _, _ string) (*openshell.Sandbox, error) {
+				return nil, &openshell.StatusError{Code: openshell.ErrorConflict, Message: "compute driver does not support sandbox suspend"}
+			},
+			wantStatus: http.StatusConflict,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sdk := &mockSDK{}
+			sdk.sandboxes.suspendFn = tc.suspendFn
+			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
+			r := chi.NewRouter()
+			r.Post("/workspaces/{workspace}/sandboxes/{name}/suspend", handler.SuspendSandbox)
+
+			req := httptest.NewRequest(http.MethodPost, "/workspaces/team-a/sandboxes/my-sandbox/suspend", nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", w.Code, tc.wantStatus, w.Body.String())
+			}
+			if tc.wantPhase == "" {
+				return
+			}
+			var got models.Sandbox
+			if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if got.Status.Phase != tc.wantPhase {
+				t.Errorf("phase = %q, want %q", got.Status.Phase, tc.wantPhase)
+			}
+		})
+	}
+}
+
+func TestResumeSandbox(t *testing.T) {
+	notSuspended := func(_ context.Context, _, _ string, _ ...openshell.ResumeOptions) (*openshell.Sandbox, error) {
+		return nil, &openshell.StatusError{Code: openshell.ErrorConflict, Message: "sandbox must be Suspended to resume (current phase: Ready)"}
+	}
+	tests := []struct {
+		resumeFn   func(ctx context.Context, workspace, name string, opts ...openshell.ResumeOptions) (*openshell.Sandbox, error)
+		name       string
+		body       string
+		wantStatus int
+		// What the SDK must have been asked with, when the call is made.
+		wantRestart bool
+	}{
+		{name: "no body asks for a restore only", wantStatus: http.StatusOK},
+		{name: "empty object asks for a restore only", body: `{}`, wantStatus: http.StatusOK},
+		{name: "false is passed on", body: `{"restartIfRestoreFails":false}`, wantStatus: http.StatusOK},
+		{name: "true is passed on", body: `{"restartIfRestoreFails":true}`, wantStatus: http.StatusOK, wantRestart: true},
+		{name: "unknown field is refused", body: `{"restart":true}`, wantStatus: http.StatusBadRequest},
+		{name: "malformed body is refused", body: `{`, wantStatus: http.StatusBadRequest},
+		{name: "not suspended conflicts", resumeFn: notSuspended, wantStatus: http.StatusConflict},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			called, asked := false, false
+			sdk := &mockSDK{}
+			sdk.sandboxes.resumeFn = func(ctx context.Context, workspace, name string, opts ...openshell.ResumeOptions) (*openshell.Sandbox, error) {
+				if workspace != "team-a" || name != "my-sandbox" {
+					return nil, fmt.Errorf("resume asked for %s/%s", workspace, name)
+				}
+				if len(opts) != 1 {
+					return nil, fmt.Errorf("resume got %d options, want 1", len(opts))
+				}
+				called, asked = true, opts[0].RestartIfRestoreFails
+				if tc.resumeFn != nil {
+					return tc.resumeFn(ctx, workspace, name, opts...)
+				}
+				return &openshell.Sandbox{ID: "id-1", Name: name, Status: openshell.SandboxStatus{Phase: openshell.SandboxStarting}}, nil
+			}
+			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
+			r := chi.NewRouter()
+			r.Post("/workspaces/{workspace}/sandboxes/{name}/resume", handler.ResumeSandbox)
+
+			var body io.Reader
+			if tc.body != "" {
+				body = strings.NewReader(tc.body)
+			}
+			req := httptest.NewRequest(http.MethodPost, "/workspaces/team-a/sandboxes/my-sandbox/resume", body)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", w.Code, tc.wantStatus, w.Body.String())
+			}
+			if tc.wantStatus == http.StatusBadRequest {
+				if called {
+					t.Fatal("a refused body still reached the gateway")
+				}
+				return
+			}
+			if !called || asked != tc.wantRestart {
+				t.Errorf("resume called = %v with restartIfRestoreFails = %v, want %v", called, asked, tc.wantRestart)
+			}
+			if tc.wantStatus != http.StatusOK {
+				return
+			}
+			var got models.Sandbox
+			if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if got.Status.Phase != "STARTING" {
+				t.Errorf("phase = %q, want STARTING", got.Status.Phase)
 			}
 		})
 	}
@@ -625,7 +766,7 @@ func TestStartSandbox(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sdk := &mockSDK{}
 			sdk.sandboxes.startFn = tc.startFn
-			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 			r := chi.NewRouter()
 			r.Post("/workspaces/{workspace}/sandboxes/{name}/start", handler.StartSandbox)
 
@@ -672,7 +813,7 @@ func TestDeleteSandbox(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sdk := &mockSDK{}
 			sdk.sandboxes.deleteFn = tc.deleteFn
-			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+			handler := NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 			r := chi.NewRouter()
 			r.Delete("/workspaces/{workspace}/sandboxes/{name}", handler.DeleteSandbox)
 

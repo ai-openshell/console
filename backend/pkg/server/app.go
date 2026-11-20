@@ -65,7 +65,7 @@ func NewApp(
 		execTimeout:   30,
 	}
 
-	sandboxSvc := services.NewSandboxService(sdkClient.Sandboxes(), exec)
+	sandboxSvc := services.NewSandboxService(sdkClient.Sandboxes(), sdkClient.SandboxSuspendResume(), exec)
 	configSvc := services.NewConfig(sdkClient.Config())
 	execSvc := services.NewExecService(sdkClient.Exec())
 	policySvc := services.NewPolicyService(sdkClient.Policy())
@@ -219,6 +219,8 @@ func (app *App) Routes() http.Handler {
 					r.Delete("/sandboxes/{name}", app.sandboxes.DeleteSandbox)
 					r.Post("/sandboxes/{name}/stop", app.sandboxes.StopSandbox)
 					r.Post("/sandboxes/{name}/start", app.sandboxes.StartSandbox)
+					r.Post("/sandboxes/{name}/suspend", app.sandboxes.SuspendSandbox)
+					r.Post("/sandboxes/{name}/resume", app.sandboxes.ResumeSandbox)
 					r.Get("/sandboxes/{name}/settings", app.settings.GetSandboxSettings)
 					r.Put("/sandboxes/{name}/settings", app.settings.SetSandboxSetting)
 					r.Delete("/sandboxes/{name}/settings", app.settings.DeleteSandboxSetting)

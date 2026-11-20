@@ -164,7 +164,7 @@ func (f *uploadFixture) router(cfg FilesHandlerConfig) http.Handler {
 		}
 		return &openshell.ExecResult{Stderr: []byte(loginShellNoise)}, nil
 	}
-	handler := NewFilesHandler(services.NewFileService(f.uploader), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), nil), cfg)
+	handler := NewFilesHandler(services.NewFileService(f.uploader), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil), cfg)
 	r := chi.NewRouter()
 	r.Post("/workspaces/{workspace}/sandboxes/{name}/files", handler.UploadFile)
 	return r

@@ -5,6 +5,10 @@ import {
   createSandbox,
   deleteSandbox,
   getSandboxLogs,
+  resumeSandbox,
+  startSandbox,
+  stopSandbox,
+  suspendSandbox,
 } from '../sandboxes';
 import {
   listWorkspaces,
@@ -113,6 +117,39 @@ describe('sandboxes API', () => {
     await deleteSandbox('default', 'my-sandbox');
     expect(mockDel).toHaveBeenCalledWith(
       '/api/v1/workspaces/default/sandboxes/my-sandbox',
+    );
+  });
+
+  it.each([
+    ['stop', stopSandbox],
+    ['start', startSandbox],
+    ['suspend', suspendSandbox],
+  ] as const)(
+    '%s posts to its own path, without a body',
+    async (verb, call) => {
+      await call('team a', 'my-sandbox');
+      expect(mockPost).toHaveBeenCalledWith(
+        `/api/v1/workspaces/team%20a/sandboxes/my-sandbox/${verb}`,
+      );
+    },
+  );
+
+  // The CLI's resume: restore the memory state or fail.
+  it('resumeSandbox sends no option of its own', async () => {
+    await resumeSandbox('team a', 'my-sandbox');
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/workspaces/team%20a/sandboxes/my-sandbox/resume',
+      undefined,
+    );
+  });
+
+  it('resumeSandbox passes on a restart when the restore fails', async () => {
+    await resumeSandbox('default', 'my-sandbox', {
+      restartIfRestoreFails: true,
+    });
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/workspaces/default/sandboxes/my-sandbox/resume',
+      { restartIfRestoreFails: true },
     );
   });
 

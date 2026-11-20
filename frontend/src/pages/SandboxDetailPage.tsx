@@ -32,8 +32,10 @@ import { useProviderExpiry } from '../api/providers';
 import {
   useDeleteSandbox,
   useSandbox,
+  useResumeSandbox,
   useStartSandbox,
   useStopSandbox,
+  useSuspendSandbox,
 } from '../api/sandboxes';
 import { useAlerts } from '../app/AlertContext';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
@@ -56,7 +58,13 @@ import SandboxSpecDetails from '../components/sandbox/SandboxSpecDetails';
 import SandboxStatusCards from '../components/sandbox/SandboxStatusCards';
 import { deletionOutcome, describeDeletion } from '../utils/deletion';
 import { formatAge, formatTimestamp } from '../utils/formatters';
-import { canStartSandbox, canStopSandbox } from '../utils/sandboxLifecycle';
+import { useI18n } from '../i18n';
+import {
+  canResumeSandbox,
+  canStartSandbox,
+  canStopSandbox,
+  canSuspendSandbox,
+} from '../utils/sandboxLifecycle';
 
 type SandboxDetailPageProps = {
   workspace: string;
@@ -74,6 +82,9 @@ const SandboxDetailPage: React.FC<SandboxDetailPageProps> = (props) => {
   const sandbox = useSandbox(workspace, sandboxName);
   const stopSandbox = useStopSandbox(workspace);
   const startSandbox = useStartSandbox(workspace);
+  const suspendSandbox = useSuspendSandbox(workspace);
+  const resumeSandbox = useResumeSandbox(workspace);
+  const { t } = useI18n('sandboxes');
   const deleteSandbox = useDeleteSandbox(workspace);
   const [isDeleteOpen, setDeleteOpen] = useState(false);
   const { addAlert, addDanger } = useAlerts();
@@ -182,7 +193,60 @@ const SandboxDetailPage: React.FC<SandboxDetailPageProps> = (props) => {
               exitCode={data.status.exitCode}
             />
           </FlexItem>
-          <FlexItem align={{ default: 'alignRight' }}>
+          {canResumeSandbox(data.status.phase) && (
+            <FlexItem align={{ default: 'alignRight' }}>
+              <Button
+                variant="secondary"
+                data-testid="sandbox-resume-button"
+                isLoading={resumeSandbox.isPending}
+                isDisabled={resumeSandbox.isPending}
+                onClick={() =>
+                  resumeSandbox.mutate(sandboxName, {
+                    onError: (err) =>
+                      addDanger(
+                        t('lifecycle.resumeFailed', {
+                          name: sandboxName,
+                          message: (err as Error).message,
+                        }),
+                      ),
+                  })
+                }
+              >
+                {t('lifecycle.resume')}
+              </Button>
+            </FlexItem>
+          )}
+          {canSuspendSandbox(data.status.phase) && (
+            <FlexItem align={{ default: 'alignRight' }}>
+              <Button
+                variant="secondary"
+                data-testid="sandbox-suspend-button"
+                isLoading={suspendSandbox.isPending}
+                isDisabled={suspendSandbox.isPending}
+                onClick={() =>
+                  suspendSandbox.mutate(sandboxName, {
+                    onError: (err) =>
+                      addDanger(
+                        t('lifecycle.suspendFailed', {
+                          name: sandboxName,
+                          message: (err as Error).message,
+                        }),
+                      ),
+                  })
+                }
+              >
+                {t('lifecycle.suspend')}
+              </Button>
+            </FlexItem>
+          )}
+          <FlexItem
+            align={
+              canResumeSandbox(data.status.phase) ||
+              canSuspendSandbox(data.status.phase)
+                ? undefined
+                : { default: 'alignRight' }
+            }
+          >
             {canStartSandbox(data.status.phase) ? (
               <Button
                 variant="secondary"

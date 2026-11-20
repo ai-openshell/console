@@ -512,6 +512,14 @@ export const sandboxes: Record<string, Sandbox[]> = {
       providers: ['openai', 'anthropic'],
       labels: { purpose: 'evaluation' },
     }),
+    // Suspended: its memory state is kept, on a gateway whose compute driver
+    // can do that. The phase and the Resume action are seen nowhere else
+    // without such a gateway.
+    mkSandbox('long-eval', 'ml-training', 'SUSPENDED', {
+      createdAgo: days(2),
+      providers: ['openai'],
+      labels: { purpose: 'evaluation' },
+    }),
     mkSandbox('notebook-dev', 'ml-training', 'PROVISIONING', {
       image: 'ghcr.io/nvidia/openshell-community/sandboxes/jupyter:latest',
       createdAgo: minutes(5),

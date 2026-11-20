@@ -106,6 +106,12 @@ func TestFromSDKSandboxPhaseMapping(t *testing.T) {
 		{openshell.SandboxError, "ERROR"},
 		{openshell.SandboxDeleting, "DELETING"},
 		{openshell.SandboxUnknown, "UNKNOWN"},
+		{openshell.SandboxStopping, "STOPPING"},
+		{openshell.SandboxStopped, "STOPPED"},
+		{openshell.SandboxStarting, "STARTING"},
+		{openshell.SandboxCompleted, "COMPLETED"},
+		{openshell.SandboxSuspending, "SUSPENDING"},
+		{openshell.SandboxSuspended, "SUSPENDED"},
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.phase), func(t *testing.T) {

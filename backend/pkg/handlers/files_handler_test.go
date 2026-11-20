@@ -102,7 +102,7 @@ func TestUploadFile(t *testing.T) {
 		}
 		return "5+0 records in", 0, nil
 	}}
-	handler := NewFilesHandler(services.NewFileService(up), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), nil), FilesHandlerConfig{})
+	handler := NewFilesHandler(services.NewFileService(up), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil), FilesHandlerConfig{})
 	r := chi.NewRouter()
 	r.Post("/workspaces/{workspace}/sandboxes/{name}/files", handler.UploadFile)
 
@@ -131,7 +131,7 @@ func TestUploadFileSandboxNotFound(t *testing.T) {
 	sdk.sandboxes.getFn = func(_ context.Context, _, _ string) (*openshell.Sandbox, error) {
 		return nil, &openshell.StatusError{Code: openshell.ErrorNotFound, Message: "sandbox not found"}
 	}
-	handler := NewFilesHandler(services.NewFileService(&mockUploader{}), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), nil), FilesHandlerConfig{})
+	handler := NewFilesHandler(services.NewFileService(&mockUploader{}), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil), FilesHandlerConfig{})
 	r := chi.NewRouter()
 	r.Post("/workspaces/{workspace}/sandboxes/{name}/files", handler.UploadFile)
 	w := httptest.NewRecorder()
@@ -153,7 +153,7 @@ func TestDownloadFile(t *testing.T) {
 		}
 		return &fakeExecStream{chunks: []openshell.ExecChunk{stdoutChunk("hello")}}, nil
 	}
-	handler := NewFilesHandler(services.NewFileService(&mockUploader{}), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), nil), FilesHandlerConfig{})
+	handler := NewFilesHandler(services.NewFileService(&mockUploader{}), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil), FilesHandlerConfig{})
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes/{name}/files", handler.DownloadFile)
 	req := httptest.NewRequest(http.MethodGet, "/workspaces/default/sandboxes/sb/files?path=/sandbox/hello.txt", nil)
@@ -172,7 +172,7 @@ func TestDownloadFileNotFound(t *testing.T) {
 	sdk.exec.runFn = func(_ context.Context, _, _ string, _ []string, _ ...openshell.ExecOptions) (*openshell.ExecResult, error) {
 		return &openshell.ExecResult{ExitCode: 1, Stderr: []byte("stat: cannot statx '/sandbox/missing.txt': No such file or directory\n")}, nil
 	}
-	handler := NewFilesHandler(services.NewFileService(&mockUploader{}), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), nil), FilesHandlerConfig{})
+	handler := NewFilesHandler(services.NewFileService(&mockUploader{}), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil), FilesHandlerConfig{})
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes/{name}/files", handler.DownloadFile)
 	req := httptest.NewRequest(http.MethodGet, "/workspaces/default/sandboxes/sb/files?path=/sandbox/missing.txt", nil)
@@ -191,7 +191,7 @@ func TestUploadFileFailed(t *testing.T) {
 	up := &mockUploader{fn: func(_ context.Context, _, _ string, _ []string, _ []byte) (string, int, error) {
 		return "dd: write error", 1, nil
 	}}
-	handler := NewFilesHandler(services.NewFileService(up), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), nil), FilesHandlerConfig{})
+	handler := NewFilesHandler(services.NewFileService(up), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil), FilesHandlerConfig{})
 	r := chi.NewRouter()
 	r.Post("/workspaces/{workspace}/sandboxes/{name}/files", handler.UploadFile)
 
@@ -213,7 +213,7 @@ func TestUploadFileExecError(t *testing.T) {
 	up := &mockUploader{fn: func(_ context.Context, _, _ string, _ []string, _ []byte) (string, int, error) {
 		return "", 0, fmt.Errorf("exec unavailable")
 	}}
-	handler := NewFilesHandler(services.NewFileService(up), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), nil), FilesHandlerConfig{})
+	handler := NewFilesHandler(services.NewFileService(up), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil), FilesHandlerConfig{})
 	r := chi.NewRouter()
 	r.Post("/workspaces/{workspace}/sandboxes/{name}/files", handler.UploadFile)
 

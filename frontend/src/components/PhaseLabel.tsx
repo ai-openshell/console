@@ -3,6 +3,7 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
   InProgressIcon,
+  PauseCircleIcon,
   PowerOffIcon,
 } from '@patternfly/react-icons';
 
@@ -16,12 +17,14 @@ type PhaseLabelProps = {
 
 // Renders a sandbox or workspace lifecycle phase. Sandbox phases come from
 // the SandboxPhase enum: PROVISIONING → READY | ERROR → DELETING, plus the
-// stop/start cycle READY → STOPPING → STOPPED → STARTING → READY, and
+// stop/start cycle READY → STOPPING → STOPPED → STARTING → READY, the
+// suspend/resume cycle READY → SUSPENDING → SUSPENDED → STARTING → READY, and
 // COMPLETED for a sandbox whose main command exited with status 0.
 //
 // The colors follow `openshell sandbox list`: COMPLETED is a success like
-// READY, and a STOPPED sandbox that reports an exit code is shown as the
-// failure it is, not as one somebody stopped.
+// READY, a STOPPED sandbox that reports an exit code is shown as the failure
+// it is, not as one somebody stopped, SUSPENDING is in progress and SUSPENDED
+// is at rest.
 const PhaseLabel: React.FC<PhaseLabelProps> = ({ phase, exitCode }) => {
   switch (phase) {
     case 'READY':
@@ -49,6 +52,7 @@ const PhaseLabel: React.FC<PhaseLabelProps> = ({ phase, exitCode }) => {
     case 'PROVISIONING':
     case 'STOPPING':
     case 'STARTING':
+    case 'SUSPENDING':
       return (
         <Label color="blue" icon={<InProgressIcon />} data-testid="phase-label">
           {phase}
@@ -68,6 +72,16 @@ const PhaseLabel: React.FC<PhaseLabelProps> = ({ phase, exitCode }) => {
       }
       return (
         <Label color="grey" icon={<PowerOffIcon />} data-testid="phase-label">
+          {phase}
+        </Label>
+      );
+    case 'SUSPENDED':
+      return (
+        <Label
+          color="grey"
+          icon={<PauseCircleIcon />}
+          data-testid="phase-label"
+        >
           {phase}
         </Label>
       );
