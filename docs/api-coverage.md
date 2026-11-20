@@ -141,6 +141,14 @@ person exports it, edits the file and chooses it again.
 
 PR 139 (`b15816c`) fixed the form's layout. It added no field.
 
+This section describes `main`. PR 149, open on 2026-11-20, gives each endpoint
+a protocol, an access preset for REST and WebSocket, and the
+allow-uninspected checkbox for plain TCP, and sends whole endpoints. With it
+the first three rows of the second table below are answered. The credential's
+auth style, `binaries` and the compat probe are not in it. When it merges,
+update the ledger entries for `ProviderProfile.endpoints` and
+`ImportProviderProfiles`, and this section.
+
 What the form can set, out of the profile's schema:
 
 | Message | The form sets | The form cannot set (file only) |
