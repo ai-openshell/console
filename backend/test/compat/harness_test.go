@@ -54,6 +54,10 @@
 //	               selector, workspace isolation, stop and
 //	               start, logs with the lines/level/source/
 //	               since filters, exposed services             sandbox_test.go
+//	               a stop of a sandbox whose main process has
+//	               exited, completed or failed, and the start
+//	               after it; suspend and resume, by the refusal
+//	               this stack's driver gives both              sandbox_phases_test.go
 //	               the main command and its terminal,
 //	               environment, annotations and services
 //	               exposed at create, read back; a runtime
@@ -140,6 +144,11 @@
 //   - A runtime class or a driver config that takes effect: the compat
 //     stack's Docker driver refuses the first and its gateway has not enabled
 //     the second. Each refusal is asserted, which proves the field arrives.
+//   - A suspend and a resume that take effect: no compute driver upstream
+//     ships can keep a sandbox's memory state, and the compat stack's Docker
+//     driver refuses both. The refusal is asserted. The round trip is
+//     written, runs only against a driver that advertises the capability, and
+//     has never run.
 //   - Request validation the BFF does on its own (bad names, bad paths,
 //     malformed bodies): it never reaches the gateway, so it belongs in the
 //     handler unit tests.

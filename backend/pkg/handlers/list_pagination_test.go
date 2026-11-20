@@ -44,13 +44,13 @@ func TestPagedListRoutesFetchOneGatewayPage(t *testing.T) {
 			path := "/workspaces/team-a/sandboxes"
 			switch route {
 			case "sandboxes":
-				r.Get("/workspaces/{workspace}/sandboxes", NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil)).ListSandboxes)
+				r.Get("/workspaces/{workspace}/sandboxes", NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil)).ListSandboxes)
 			case "workspaces":
 				path = "/workspaces"
 				r.Get(path, NewWorkspacesHandler(sdk.Workspaces()).ListWorkspaces)
 			case "all-sandboxes":
 				path = "/sandboxes"
-				r.Get(path, NewAllWorkspacesHandler(services.NewSandboxService(sdk.Sandboxes(), nil), nil, nil, nil).ListSandboxes)
+				r.Get(path, NewAllWorkspacesHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil), nil, nil, nil).ListSandboxes)
 			}
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path+"?pageSize=1&pageToken=prior-token&labelSelector=type%3Dtool", nil))
@@ -88,8 +88,8 @@ func TestPagedListValidation(t *testing.T) {
 				sdk := &mockSDK{}
 				r := chi.NewRouter()
 				r.Get("/workspaces", NewWorkspacesHandler(sdk.Workspaces()).ListWorkspaces)
-				r.Get("/workspaces/{workspace}/sandboxes", NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), nil)).ListSandboxes)
-				r.Get("/sandboxes", NewAllWorkspacesHandler(services.NewSandboxService(sdk.Sandboxes(), nil), nil, nil, nil).ListSandboxes)
+				r.Get("/workspaces/{workspace}/sandboxes", NewSandboxHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil)).ListSandboxes)
+				r.Get("/sandboxes", NewAllWorkspacesHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil), nil, nil, nil).ListSandboxes)
 				w := httptest.NewRecorder()
 				r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path+"?"+query, nil))
 				if w.Code != http.StatusBadRequest {

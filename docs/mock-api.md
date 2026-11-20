@@ -37,7 +37,7 @@ Every list answers empty and only the `default` workspace a gateway starts with 
 - **Workspaces** (4): `default`, `ml-training`, `dev-sandbox`, `staging` — each with members
 - **Providers** (3–4 per workspace): OpenAI, Anthropic, GitHub, NVIDIA NIM — with credential expiry and refresh status
 - **Provider Profiles** (5 platform-scope): OpenAI, Anthropic, GitHub, NVIDIA NIM, Slack — with full credential schemas and network endpoints
-- **Sandboxes** (10 total): varied phases — READY, PROVISIONING, STOPPED, STOPPING, ERROR, COMPLETED — with attached providers, endpoint statuses, and conditions
+- **Sandboxes** (11 total): varied phases — READY, PROVISIONING, STOPPED, STOPPING, SUSPENDED, ERROR, COMPLETED — with attached providers, endpoint statuses, and conditions
 - **Sandbox Logs**: 10 lines per sandbox with gateway + sandbox sources, levels (INFO/DEBUG/WARN), and structured decision fields
 - **Sandbox Policy**: per-sandbox policy views with loaded revisions and network policy rules
 - **Effective Policy**: sandbox-scoped with OpenAI endpoint rule

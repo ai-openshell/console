@@ -21,6 +21,8 @@ jest.mock('../../api/auth', () => ({
 jest.mock('../../api/sandboxes', () => ({
   useSandbox: jest.fn(),
   useStartSandbox: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
+  useSuspendSandbox: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
+  useResumeSandbox: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
   useStopSandbox: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
   // The header and its actions are covered in SandboxDetailPage.header.spec.tsx.
   useDeleteSandbox: jest.fn(() => ({

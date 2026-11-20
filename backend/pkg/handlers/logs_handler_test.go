@@ -46,7 +46,7 @@ func TestGetSandboxLogs(t *testing.T) {
 		}, nil
 	}
 	// TODO: Add actual rawexecclient
-	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes/{name}/logs", handler.GetSandboxLogs)
 	req := httptest.NewRequest(http.MethodGet, "/workspaces/default/sandboxes/my-sandbox/logs?lines=50&sinceMs=1000&source=gateway&source=sandbox&level=INFO", nil)
@@ -75,7 +75,7 @@ func TestGetSandboxLogsDefaults(t *testing.T) {
 		}
 		return &openshell.LogResult{}, nil
 	}
-	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes/{name}/logs", handler.GetSandboxLogs)
 	req := httptest.NewRequest(http.MethodGet, "/workspaces/default/sandboxes/my-sandbox/logs?lines=notanumber", nil)
@@ -91,7 +91,7 @@ func TestGetSandboxLogsNotFound(t *testing.T) {
 	sdk.sandboxes.getLogsFn = func(_ context.Context, _, _ string, _ ...openshell.LogOption) (*openshell.LogResult, error) {
 		return nil, &openshell.StatusError{Code: openshell.ErrorNotFound, Message: "sandbox not found"}
 	}
-	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes/{name}/logs", handler.GetSandboxLogs)
 	req := httptest.NewRequest(http.MethodGet, "/workspaces/default/sandboxes/missing/logs", nil)
@@ -122,7 +122,7 @@ func TestStreamSandboxLogs(t *testing.T) {
 		}
 		return stream, nil
 	}}
-	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), raw))
+	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), raw))
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes/{name}/logs/stream", handler.StreamSandboxLogs)
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -171,7 +171,7 @@ func TestStreamSandboxLogsError(t *testing.T) {
 		streamCtx = ctx
 		return stream, nil
 	}}
-	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), raw))
+	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), raw))
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes/{name}/logs/stream", handler.StreamSandboxLogs)
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -212,7 +212,7 @@ func TestListSandboxProviders(t *testing.T) {
 			},
 		}, nil
 	}
-	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes/{name}/providers", handler.ListSandboxProviders)
 
@@ -247,7 +247,7 @@ func TestListSandboxProvidersNamesCredentialsFromTheKeyReader(t *testing.T) {
 		return []*openshell.Provider{gatewayProvider("attached")}, nil
 	}
 	reader := &fakeCredentialKeys{bySandbox: map[string][]string{"attached": {"GITHUB_TOKEN"}}}
-	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 	handler.SetCredentialKeyReader(reader)
 	r := chi.NewRouter()
 	r.Get("/workspaces/{workspace}/sandboxes/{name}/providers", handler.ListSandboxProviders)
@@ -295,7 +295,7 @@ func TestAttachDetachSandboxProvider(t *testing.T) {
 	sdk.sandboxes.detachFn = func(_ context.Context, _, sandboxName, _ string, _ uint64) (*openshell.DetachProviderResult, error) {
 		return &openshell.DetachProviderResult{Detached: true, Sandbox: &openshell.Sandbox{Name: sandboxName}}, nil
 	}
-	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), nil))
+	handler := NewLogsHandler(services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil))
 	r := chi.NewRouter()
 	r.Post("/workspaces/{workspace}/sandboxes/{name}/providers/{provider}", handler.AttachSandboxProvider)
 	r.Delete("/workspaces/{workspace}/sandboxes/{name}/providers/{provider}", handler.DetachSandboxProvider)

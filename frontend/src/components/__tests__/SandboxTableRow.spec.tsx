@@ -45,6 +45,8 @@ const renderRow = (sandbox: Sandbox, props: RowProps = {}) =>
           onDelete={jest.fn()}
           onStop={jest.fn()}
           onStart={jest.fn()}
+          onSuspend={jest.fn()}
+          onResume={jest.fn()}
           onViewLogs={jest.fn()}
           {...props}
         />
@@ -307,14 +309,27 @@ describe('SandboxTableRow', () => {
   });
 
   describe('actions', () => {
-    it('offers a start and no stop on a completed sandbox', () => {
+    // A start of a completed sandbox is accepted by gateway 0.1.9 and, with
+    // the Docker driver, then fails and leaves the sandbox in ERROR. A stop,
+    // then a start, runs it again.
+    it('offers a stop and no start on a completed sandbox', () => {
       renderRow(makeSandbox({ phase: 'COMPLETED', exitCode: 0 }));
-      expect(actionTitles()).toEqual(['Logs', 'Start', 'Delete']);
+      expect(actionTitles()).toEqual(['Logs', 'Stop', 'Delete']);
     });
 
-    it('offers a stop on a ready sandbox', () => {
-      renderRow(makeSandbox());
+    it('offers a stop on a sandbox in ERROR', () => {
+      renderRow(makeSandbox({ phase: 'ERROR', exitCode: 3 }));
       expect(actionTitles()).toEqual(['Logs', 'Stop', 'Delete']);
+    });
+
+    it('offers a suspend and a stop on a ready sandbox', () => {
+      renderRow(makeSandbox());
+      expect(actionTitles()).toEqual(['Logs', 'Suspend', 'Stop', 'Delete']);
+    });
+
+    it('offers a resume and a stop, and no start, on a suspended sandbox', () => {
+      renderRow(makeSandbox({ phase: 'SUSPENDED' }));
+      expect(actionTitles()).toEqual(['Logs', 'Resume', 'Stop', 'Delete']);
     });
 
     it('offers a start on a stopped sandbox', () => {
@@ -322,17 +337,27 @@ describe('SandboxTableRow', () => {
       expect(actionTitles()).toEqual(['Logs', 'Start', 'Delete']);
     });
 
-    it('offers neither while the sandbox is provisioning', () => {
+    it('offers none of them while the sandbox is provisioning', () => {
       renderRow(makeSandbox({ phase: 'PROVISIONING' }));
       expect(actionTitles()).toEqual(['Logs', 'Delete']);
     });
 
-    it('starts the completed sandbox that Start is clicked on', () => {
-      const onStart = jest.fn();
-      renderRow(makeSandbox({ phase: 'COMPLETED', exitCode: 0 }), { onStart });
+    it('offers a suspend and a resume only where the page handles them', () => {
+      renderRow(makeSandbox(), { onSuspend: undefined });
+      expect(actionTitles()).toEqual(['Logs', 'Stop', 'Delete']);
+    });
+
+    it.each([
+      ['Start', 'STOPPED', 'onStart'],
+      ['Stop', 'COMPLETED', 'onStop'],
+      ['Suspend', 'READY', 'onSuspend'],
+      ['Resume', 'SUSPENDED', 'onResume'],
+    ] as const)('%s on a sandbox that is %s calls %s', (title, phase, prop) => {
+      const handler = jest.fn();
+      renderRow(makeSandbox({ phase }), { [prop]: handler });
       fireEvent.click(screen.getByRole('button', { name: /kebab toggle/i }));
-      fireEvent.click(screen.getByRole('menuitem', { name: 'Start' }));
-      expect(onStart).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('menuitem', { name: title }));
+      expect(handler).toHaveBeenCalledTimes(1);
     });
   });
 });

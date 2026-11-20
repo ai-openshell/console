@@ -32,7 +32,7 @@ func (m *mockSDK) Exec() openshell.ExecInterface          { return &m.exec }
 func (m *mockSDK) Files() openshell.FileInterface         { return &m.files }
 func (m *mockSDK) Health() openshell.HealthInterface      { return &m.health }
 func (m *mockSDK) SandboxSuspendResume() openshell.SandboxSuspendResumeInterface {
-	panic("not implemented")
+	return &m.sandboxes
 }
 func (m *mockSDK) SSH() openshell.SSHInterface { panic("not implemented") }
 func (m *mockSDK) TCP() openshell.TCPInterface { panic("not implemented") }
@@ -142,6 +142,8 @@ type mockSDKSandboxes struct {
 	getLogsFn       func(ctx context.Context, workspace, name string, opts ...openshell.LogOption) (*openshell.LogResult, error)
 	stopFn          func(ctx context.Context, workspace, name string) (*openshell.Sandbox, error)
 	startFn         func(ctx context.Context, workspace, name string) (*openshell.Sandbox, error)
+	suspendFn       func(ctx context.Context, workspace, name string) (*openshell.Sandbox, error)
+	resumeFn        func(ctx context.Context, workspace, name string, opts ...openshell.ResumeOptions) (*openshell.Sandbox, error)
 }
 
 // mockSandboxRawExec provides the raw WatchSandbox call used for live logs.
@@ -268,6 +270,24 @@ func (m *mockSDKSandboxes) Stop(ctx context.Context, workspace, name string) (*o
 		return m.stopFn(ctx, workspace, name)
 	}
 	return &openshell.Sandbox{Name: name}, nil
+}
+
+func (m *mockSDKSandboxes) Suspend(ctx context.Context, workspace, name string) (*openshell.Sandbox, error) {
+	if m.suspendFn != nil {
+		return m.suspendFn(ctx, workspace, name)
+	}
+	return &openshell.Sandbox{Name: name}, nil
+}
+
+func (m *mockSDKSandboxes) Resume(ctx context.Context, workspace, name string, opts ...openshell.ResumeOptions) (*openshell.Sandbox, error) {
+	if m.resumeFn != nil {
+		return m.resumeFn(ctx, workspace, name, opts...)
+	}
+	return &openshell.Sandbox{Name: name}, nil
+}
+
+func (m *mockSDKSandboxes) WaitSuspended(_ context.Context, _, _ string, _ ...openshell.WaitOptions) (*openshell.Sandbox, error) {
+	panic("not implemented")
 }
 
 func (m *mockSDKSandboxes) WaitStopped(_ context.Context, _, _ string, _ ...openshell.WaitOptions) (*openshell.Sandbox, error) {

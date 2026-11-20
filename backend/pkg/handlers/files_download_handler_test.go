@@ -136,7 +136,7 @@ func (f *downloadFixture) router(cfg FilesHandlerConfig) http.Handler {
 		f.stream.ctx = ctx
 		return f.stream, nil
 	}
-	handler := NewFilesHandler(services.NewFileService(&mockUploader{}), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), nil), cfg)
+	handler := NewFilesHandler(services.NewFileService(&mockUploader{}), services.NewExecService(sdk.Exec()), services.NewSandboxService(sdk.Sandboxes(), sdk.SandboxSuspendResume(), nil), cfg)
 	r := chi.NewRouter()
 	// The middleware the app serves this route through: an aborted download
 	// has to get past its recoverer.

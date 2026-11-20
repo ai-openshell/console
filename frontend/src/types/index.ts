@@ -46,11 +46,13 @@ export type WorkspaceMember = {
   role: WorkspaceRole | 'UNSPECIFIED';
 };
 
-// openshell.v1.SandboxPhase — the full lifecycle. Sandboxes can be stopped
-// (retaining persistent state) and started again:
-// PROVISIONING → READY → STOPPING → STOPPED → STARTING → READY, plus ERROR and
-// DELETING terminal/transitional states. COMPLETED is a sandbox whose main
-// command exited with status 0; a nonzero exit is ERROR.
+// openshell.v1.SandboxPhase — the full lifecycle. A sandbox can be stopped
+// (its persistent state is kept) and started again:
+// PROVISIONING → READY → STOPPING → STOPPED → STARTING → READY, and, where the
+// gateway's compute driver supports it, suspended (its memory state is kept
+// too) and resumed: READY → SUSPENDING → SUSPENDED → STARTING → READY. ERROR
+// and DELETING are the terminal and transitional states. COMPLETED is a
+// sandbox whose main command exited with status 0; a nonzero exit is ERROR.
 export type SandboxPhase =
   | 'PROVISIONING'
   | 'READY'
@@ -60,6 +62,8 @@ export type SandboxPhase =
   | 'STOPPED'
   | 'STARTING'
   | 'COMPLETED'
+  | 'SUSPENDING'
+  | 'SUSPENDED'
   | 'UNKNOWN'
   | 'UNSPECIFIED';
 

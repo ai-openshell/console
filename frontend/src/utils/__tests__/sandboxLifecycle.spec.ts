@@ -1,6 +1,8 @@
 import {
+  canResumeSandbox,
   canStartSandbox,
   canStopSandbox,
+  canSuspendSandbox,
   getConfigurationRejection,
   hasPolicyRevision,
   sandboxPhaseTone,
@@ -17,6 +19,8 @@ const ALL_PHASES: SandboxPhase[] = [
   'STOPPED',
   'STARTING',
   'COMPLETED',
+  'SUSPENDING',
+  'SUSPENDED',
   'UNKNOWN',
   'UNSPECIFIED',
 ];
@@ -34,16 +38,21 @@ const sandboxWith = (status: Partial<SandboxStatus>): Sandbox => ({
 });
 
 describe('lifecycle actions', () => {
-  // What gateway 0.1.2 takes: a start from Stopped or Completed, a stop from
-  // Ready. It answers a stop of a completed sandbox without doing anything.
+  // What gateway 0.1.9 takes, as far as it was seen to work with the Docker
+  // driver: a stop from Ready, Completed and Error (and, read from its source,
+  // from Suspending and Suspended), a start from Stopped. It accepts a start
+  // of a completed sandbox too, and that start then fails and leaves the
+  // sandbox in Error, so it is not offered.
   it.each<[SandboxPhase, boolean, boolean]>([
     ['READY', false, true],
     ['STOPPED', true, false],
-    ['COMPLETED', true, false],
+    ['COMPLETED', false, true],
+    ['ERROR', false, true],
+    ['SUSPENDING', false, true],
+    ['SUSPENDED', false, true],
     ['PROVISIONING', false, false],
     ['STARTING', false, false],
     ['STOPPING', false, false],
-    ['ERROR', false, false],
     ['DELETING', false, false],
     ['UNKNOWN', false, false],
     ['UNSPECIFIED', false, false],
@@ -57,6 +66,38 @@ describe('lifecycle actions', () => {
       expect(canStartSandbox(phase) && canStopSandbox(phase)).toBe(false);
     }
   });
+
+  it('offers a suspend for a ready sandbox only', () => {
+    expect(ALL_PHASES.filter(canSuspendSandbox)).toEqual(['READY']);
+  });
+
+  it('offers a resume for a suspended sandbox only', () => {
+    expect(ALL_PHASES.filter(canResumeSandbox)).toEqual(['SUSPENDED']);
+  });
+
+  // A start boots a suspended sandbox afresh and discards the memory state a
+  // resume would restore.
+  it('does not offer a start beside the resume', () => {
+    expect(canStartSandbox('SUSPENDED')).toBe(false);
+  });
+
+  it('leaves every phase but the transitional ones a way on', () => {
+    const stuck = ALL_PHASES.filter(
+      (phase) =>
+        !canStartSandbox(phase) &&
+        !canStopSandbox(phase) &&
+        !canSuspendSandbox(phase) &&
+        !canResumeSandbox(phase),
+    );
+    expect(stuck).toEqual([
+      'PROVISIONING',
+      'DELETING',
+      'STOPPING',
+      'STARTING',
+      'UNKNOWN',
+      'UNSPECIFIED',
+    ]);
+  });
 });
 
 describe('sandboxPhaseTone', () => {
@@ -67,8 +108,10 @@ describe('sandboxPhaseTone', () => {
     ['PROVISIONING', 'progress'],
     ['STARTING', 'progress'],
     ['STOPPING', 'progress'],
+    ['SUSPENDING', 'progress'],
     ['DELETING', 'deleting'],
     ['STOPPED', 'stopped'],
+    ['SUSPENDED', 'stopped'],
     ['UNKNOWN', 'unknown'],
     ['UNSPECIFIED', 'unknown'],
   ])('%s is %s', (phase, tone) => {

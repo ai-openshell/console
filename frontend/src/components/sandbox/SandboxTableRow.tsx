@@ -21,9 +21,12 @@ import PendingProposalsLabel from './PendingProposalsLabel';
 import { getPolicySummary } from './SandboxEgressSummary';
 import StatusDot from '../StatusDot';
 import { formatAge } from '../../utils/formatters';
+import { useI18n } from '../../i18n';
 import {
+  canResumeSandbox,
   canStartSandbox,
   canStopSandbox,
+  canSuspendSandbox,
   getConfigurationRejection,
   sandboxPhaseTone,
 } from '../../utils/sandboxLifecycle';
@@ -44,6 +47,8 @@ type SandboxTableRowProps = {
   onDelete: () => void;
   onStop?: () => void;
   onStart?: () => void;
+  onSuspend?: () => void;
+  onResume?: () => void;
   onViewLogs: () => void;
   onOpenTerminal?: () => void;
   policyView?: SandboxPolicyView;
@@ -79,12 +84,15 @@ const SandboxTableRow: React.FC<SandboxTableRowProps> = ({
   onDelete,
   onStop,
   onStart,
+  onSuspend,
+  onResume,
   onViewLogs,
   onOpenTerminal,
   policyView,
   draftSummary,
   onReviewDrafts,
 }) => {
+  const { t } = useI18n('sandboxes');
   const pc: PolicySummary = getPolicySummary(
     policyView,
     sandbox.spec.policy,
@@ -101,11 +109,17 @@ const SandboxTableRow: React.FC<SandboxTableRowProps> = ({
   const actionItems = [
     ...(onOpenTerminal ? [{ title: 'Terminal', onClick: onOpenTerminal }] : []),
     { title: 'Logs', onClick: onViewLogs },
-    ...(onStop && canStopSandbox(phase)
-      ? [{ title: 'Stop', onClick: onStop }]
+    ...(onResume && canResumeSandbox(phase)
+      ? [{ title: t('lifecycle.resume'), onClick: onResume }]
       : []),
     ...(onStart && canStartSandbox(phase)
       ? [{ title: 'Start', onClick: onStart }]
+      : []),
+    ...(onSuspend && canSuspendSandbox(phase)
+      ? [{ title: t('lifecycle.suspend'), onClick: onSuspend }]
+      : []),
+    ...(onStop && canStopSandbox(phase)
+      ? [{ title: 'Stop', onClick: onStop }]
       : []),
     { title: 'Delete', onClick: onDelete },
   ];

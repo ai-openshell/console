@@ -84,7 +84,7 @@ func newAllWorkspacesFixture(keys services.ProviderCredentialKeyReader) *allWork
 	}
 
 	handler := NewAllWorkspacesHandler(
-		services.NewSandboxService(f.sdk.Sandboxes(), nil),
+		services.NewSandboxService(f.sdk.Sandboxes(), f.sdk.SandboxSuspendResume(), nil),
 		services.NewProviderService(f.sdk.Providers()),
 		services.NewTemplateService(f.sdk),
 		services.NewServiceService(f.sdk.Services()),

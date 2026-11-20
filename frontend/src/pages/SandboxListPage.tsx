@@ -39,8 +39,10 @@ import { sandboxKeys } from '../api/queryKeys';
 import {
   deleteSandbox,
   useSandboxPage,
+  useResumeSandbox,
   useStartSandbox,
   useStopSandbox,
+  useSuspendSandbox,
 } from '../api/sandboxes';
 import { useAlerts } from '../app/AlertContext';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
@@ -133,6 +135,7 @@ const SandboxListPage: React.FC<SandboxListPageProps> = ({
   const [nameFilter, setNameFilter] = useState('');
   const resultsRef = useRef<HTMLHeadingElement>(null);
   const { t: tCommon } = useI18n('common');
+  const { t: tSandboxes } = useI18n('sandboxes');
   const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode);
   const scope = `${workspace}\0${labelSelector}\0${typeLabel}`;
   const {
@@ -218,6 +221,8 @@ const SandboxListPage: React.FC<SandboxListPageProps> = ({
   const { addAlert, addSuccess, addDanger } = useAlerts();
   const stopSandbox = useStopSandbox(workspace);
   const startSandbox = useStartSandbox(workspace);
+  const suspendSandbox = useSuspendSandbox(workspace);
+  const resumeSandbox = useResumeSandbox(workspace);
   const bulkDelete = useBulkDelete(
     (name) => deleteSandbox(workspace, name),
     sandboxKeys.scope(workspace),
@@ -538,6 +543,40 @@ const SandboxListPage: React.FC<SandboxListPageProps> = ({
                       onError: (err) =>
                         addDanger(
                           `Failed to start sandbox ${sandbox.metadata.name}: ${(err as Error).message}`,
+                        ),
+                    })
+                  }
+                  onSuspend={() =>
+                    suspendSandbox.mutate(sandbox.metadata.name, {
+                      onSuccess: () =>
+                        addSuccess(
+                          tSandboxes('lifecycle.suspending', {
+                            name: sandbox.metadata.name,
+                          }),
+                        ),
+                      onError: (err) =>
+                        addDanger(
+                          tSandboxes('lifecycle.suspendFailed', {
+                            name: sandbox.metadata.name,
+                            message: (err as Error).message,
+                          }),
+                        ),
+                    })
+                  }
+                  onResume={() =>
+                    resumeSandbox.mutate(sandbox.metadata.name, {
+                      onSuccess: () =>
+                        addSuccess(
+                          tSandboxes('lifecycle.resuming', {
+                            name: sandbox.metadata.name,
+                          }),
+                        ),
+                      onError: (err) =>
+                        addDanger(
+                          tSandboxes('lifecycle.resumeFailed', {
+                            name: sandbox.metadata.name,
+                            message: (err as Error).message,
+                          }),
                         ),
                     })
                   }

@@ -30,6 +30,8 @@ jest.mock('../../api/sandboxes', () => ({
   deleteSandbox: jest.fn(),
   useStopSandbox: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
   useStartSandbox: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
+  useSuspendSandbox: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
+  useResumeSandbox: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
   useCreateSandbox: jest.fn(() => ({
     mutate: jest.fn(),
     reset: jest.fn(),
