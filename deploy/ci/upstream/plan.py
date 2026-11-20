@@ -13,12 +13,19 @@ Two answers come out of it:
            bumps only to a stable release; a version a person asked for is
            bumped to whatever it is, so a pre-release gets a prep branch.
 
+A third thing rides along and decides nothing: `api`, what a signed-in person
+can reach in the target's gateway that they cannot in the pinned one, read
+from the two releases' protos (apidiff.py). It is there so that the bump pull
+request, the run summary and check A's issue say what is new.
+
 Nothing here opens a socket. The network is the Upstream object passed in.
 """
 
+import apidiff
 import pins
+import protoapi
 import versions
-from upstream import GATEWAY_REPOSITORY, REGISTRY, SDK_MODULE, SDK_URL, SUPERVISOR_REPOSITORY
+from upstream import GATEWAY_REPOSITORY, REGISTRY, SDK_MODULE, SDK_URL, SUPERVISOR_REPOSITORY, UpstreamError
 
 
 class PlanError(Exception):
@@ -90,12 +97,35 @@ def _requested(found, pinned, version):
     return match[0]
 
 
-def build(doc, upstream, requested=None):
+def api_changes(upstream, old_version, new_version, ledger=None, source=None):
+    """What is new in the gateway's API between two releases, for the reports.
+
+    Never raises for what it cannot read: this informs and decides nothing,
+    so a tag without protos, or a proto this parser does not know, must not
+    stop a bump or check A. The reports then say the comparison is missing,
+    and why, which is what keeps "nothing new" from being read into silence.
+    """
+    out = {"from": old_version, "to": new_version, "error": None, "changes": None}
+    try:
+        surfaces = []
+        for version in (old_version, new_version):
+            files = upstream.proto_files(version)
+            surfaces.append(protoapi.surface(protoapi.load(files.get)))
+        out["changes"] = apidiff.annotate(apidiff.diff(*surfaces), ledger, source)
+    except (UpstreamError, protoapi.ProtoError) as err:
+        out["error"] = str(err)
+    return out
+
+
+def build(doc, upstream, requested=None, ledger=None, source=None):
     """Everything one run needs to know, as plain data.
 
     doc: the pins of the branch the workflow runs on, which is `main` for
     every run that acts.
     requested: a release a person asked to bump to (no leading v), or None.
+    ledger, source: the coverage ledger and the dashboard's source, which say
+    of each new piece of the API whether the dashboard has it. Without them
+    the report lists what is new and says nothing of the dashboard.
     """
     problems = pins.validate(doc)
     if problems:
@@ -167,4 +197,5 @@ def build(doc, upstream, requested=None):
         "sdk": sdk,
         "sdk_waiting_for": sdk_waiting_for,
     }
+    plan["api"] = api_changes(upstream, pinned, target["version"], ledger, source)
     return plan

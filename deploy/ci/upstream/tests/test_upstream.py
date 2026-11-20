@@ -6,11 +6,15 @@ answer) from "could not ask" (an error that must stop the run).
 """
 
 import json
+import os
+import shutil
 import subprocess
+import tempfile
 import unittest
 from unittest import mock
 
 import upstream
+from tests import protos, support
 
 DIGEST = "sha256:" + "ab" * 32
 REFERENCE = "ghcr.io/nvidia/openshell/gateway:0.1.4"
@@ -109,6 +113,34 @@ class ReleaseTags(unittest.TestCase):
         self.assertEqual(check_output.call_args[0][0], ["git", "ls-remote", "--tags", upstream.SDK_REPO])
         self.assertEqual(upstream.GATEWAY_REPOSITORY, "nvidia/openshell/gateway")
         self.assertEqual(upstream.SUPERVISOR_REPOSITORY, "nvidia/openshell/supervisor")
+
+
+
+class ProtoFiles(unittest.TestCase):
+    """The protos of a release, cloned for real from a repository on disk."""
+
+    def setUp(self):
+        scratch = tempfile.mkdtemp(prefix="upstream-clone-")
+        self.addCleanup(shutil.rmtree, scratch, ignore_errors=True)
+        repo = support.proto_repo(
+            os.path.join(scratch, "upstream"),
+            [(protos.OLD_VERSION, protos.files(protos.OLD)), (protos.NEW_VERSION, protos.files(protos.NEW))],
+        )
+        patch = mock.patch.object(upstream, "UPSTREAM_REPO", "file://" + repo)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_each_tag_gives_its_own_files(self):
+        old = upstream.Upstream().proto_files(protos.OLD_VERSION)
+        new = upstream.Upstream().proto_files(protos.NEW_VERSION)
+        self.assertEqual(sorted(old), ["datamodel.proto", "openshell.proto", "options.proto"])
+        self.assertNotIn("SuspendSandbox", old["openshell.proto"])
+        self.assertIn("SuspendSandbox", new["openshell.proto"])
+
+    def test_a_tag_that_does_not_exist_is_an_error(self):
+        with self.assertRaises(upstream.UpstreamError) as raised:
+            upstream.Upstream().proto_files("9.9.9")
+        self.assertIn("reading the protos of v9.9.9 failed", str(raised.exception))
 
 
 if __name__ == "__main__":

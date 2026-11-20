@@ -6,6 +6,7 @@ the run summaries. Each says only what this run did or observed.
 
 import textwrap
 
+import apidiff
 import bump
 import versions
 from upstream import LEGACY_SDK_MODULE, SDK_MODULE, UPSTREAM_URL
@@ -15,6 +16,7 @@ WORKFLOW_PATH = ".github/workflows/follow-upstream.yml"
 PINS_PATH = "deploy/ci/gateway-pins.json"
 
 BASE = "main"
+SELF = "python3 deploy/ci/upstream/follow.py"
 
 # The bump commit's title, and its pull request's. The release that follows
 # the merge lists it as written. Nothing reads it: a release is cut by hand
@@ -78,6 +80,30 @@ def _sdk_commit(target):
 
 
 # --- the pin commit --------------------------------------------------------
+
+
+def api_section(plan, limit=0, heading="##"):
+    """What is new in the gateway's API between the pin and the target, as Markdown.
+
+    Empty for a plan made before the comparison existed. A comparison that
+    could not be made says so: silence would read as "nothing new".
+    """
+    api = plan.get("api")
+    if not api:
+        return ""
+    if api.get("error"):
+        return "\n".join(
+            [
+                "%s What is new in the gateway's API" % heading,
+                "",
+                "**Not compared.** The protos of OpenShell %s and %s could not be read: %s"
+                % (_code(api["from"]), _code(api["to"]), api["error"]),
+                "",
+                "By hand: `%s api-diff --from %s --to %s`." % (SELF, api["from"], api["to"]),
+                "",
+            ]
+        )
+    return apidiff.render(api["changes"], api["from"], api["to"], limit=limit, heading=heading)
 
 
 def pr_title(release):
@@ -175,6 +201,16 @@ def pr_body(plan, repo_url="", migrated=False):
         "",
         "**After it merges,** cut a release by hand: Actions > Publish > Run workflow on `main`.",
     ]
+    section = api_section(plan, limit=apidiff.PR_ROWS)
+    if section:
+        lines += [
+            "",
+            section.rstrip("\n"),
+            "",
+            "Nothing above has to be done for this move to merge. It is what the dashboard does not "
+            "offer yet: classify each in `deploy/ci/upstream/api-coverage.json` (`%s api-coverage` "
+            "lists what is unclassified) and open an issue for what should be built." % SELF,
+        ]
     return "\n".join(lines) + "\n"
 
 
@@ -315,6 +351,9 @@ def issue_text(plan, run_url="", repo_url=""):
             "`%s`, where CI runs the suite with the console built on the new line's SDK. The console's "
             "minor release waits until that passes (ADR 0005, decision 2)." % (_code(version), target["branch"]),
         ]
+    section = api_section(plan, limit=apidiff.PR_ROWS, heading="###")
+    if section:
+        lines += ["", section.rstrip("\n")]
     return title, "\n".join(lines) + "\n"
 
 
@@ -372,6 +411,9 @@ def plan_summary(plan, dry_run=False):
             "- **No bump yet:** %s. Check A does not need the SDK and still runs. The next run looks again."
             % target["sdk_waiting_for"]
         )
+    section = api_section(plan)
+    if section:
+        lines += ["", section.rstrip("\n")]
     return "\n".join(lines) + "\n"
 
 

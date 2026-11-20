@@ -15,6 +15,8 @@ made here, where it can be unit-tested:
     publish          push the bump branch and open its pull request
     record-check     turn check A's step outcomes into a result
     check-report     what check A's result means; render its issue
+    api-diff         what is new in the gateway's API between two releases
+    api-coverage     check the coverage ledger and the document made from it
 
 Standard library only: a runner needs nothing installed to use it.
 """
@@ -26,10 +28,13 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import apicoverage  # noqa: E402
+import apidiff  # noqa: E402
 import bump  # noqa: E402
 import pinmove  # noqa: E402
 import pins  # noqa: E402
 import plan as plan_module  # noqa: E402
+import protoapi  # noqa: E402
 import publish as publish_module  # noqa: E402
 import report  # noqa: E402
 import upstream as upstream_module  # noqa: E402
@@ -37,6 +42,8 @@ import versions  # noqa: E402
 
 DEFAULT_PINS = "deploy/ci/gateway-pins.json"
 DEFAULT_GO_MOD = "backend/go.mod"
+DEFAULT_LEDGER = "deploy/ci/upstream/api-coverage.json"
+DEFAULT_COVERAGE_DOC = "docs/api-coverage.md"
 SELF = "python3 deploy/ci/upstream/follow.py"
 
 
@@ -141,7 +148,13 @@ def cmd_require_stable(args):
 
 def cmd_plan(args, upstream=None):
     doc = _load_valid_pins(args.pins, args.go_mod)
-    made = plan_module.build(doc, upstream or upstream_module.Upstream(), requested=args.version or None)
+    made = plan_module.build(
+        doc,
+        upstream or upstream_module.Upstream(),
+        requested=args.version or None,
+        ledger=_json(args.ledger),
+        source=apidiff.Source(args.root),
+    )
     _write(args.out, json.dumps(made, indent=2) + "\n")
     summary = report.plan_summary(made, dry_run=args.dry_run == "true")
     if args.summary:
@@ -284,6 +297,70 @@ def cmd_check_report(args):
     return 0
 
 
+def _surface(version, repo, upstream):
+    """The user-facing API of a release: from a local clone, else from upstream."""
+    if repo:
+        read = protoapi.git_reader(repo, "v%s" % version)
+    else:
+        read = (upstream or upstream_module.Upstream()).proto_files(version).get
+    return protoapi.surface(protoapi.load(read))
+
+
+def cmd_api_diff(args, upstream=None):
+    try:
+        old = _surface(args.old, args.repo, upstream)
+        new = _surface(args.new, args.repo, upstream)
+    except (protoapi.ProtoError, upstream_module.UpstreamError) as err:
+        return _fail([str(err)])
+    changes = apidiff.annotate(apidiff.diff(old, new), _json(args.ledger), apidiff.Source(args.root))
+    text = apidiff.render(changes, args.old, args.new, limit=args.limit)
+    if args.out:
+        _write(args.out, text)
+    print(text)
+    return 0
+
+
+def cmd_api_coverage(args, upstream=None):
+    ledger = apicoverage.load(args.ledger)
+    problems = apicoverage.problems(ledger)
+    if problems:
+        return _fail(["%s: %s" % (args.ledger, problem) for problem in problems])
+    document = _read(args.doc)
+    try:
+        wanted = apicoverage.write_into(document, ledger)
+    except ValueError as err:
+        return _fail(["%s: %s" % (args.doc, err)])
+    if args.write:
+        if wanted != document:
+            _write(args.doc, wanted)
+            print("%s: rewritten from %s" % (args.doc, args.ledger))
+    elif wanted != document:
+        return _fail(["%s is not what %s says. Run: %s api-coverage --write" % (args.doc, args.ledger, SELF)])
+
+    made = apicoverage.counts(ledger)
+    print(
+        "%s: OpenShell %s, %d RPCs (%d not offered), %d request fields (%d not offered)"
+        % (args.ledger, ledger["release"], sum(made["rpcs"].values()), made["rpcs"]["none"], sum(made["fields"].values()), made["fields"]["none"])
+    )
+    if not (args.upstream or args.repo):
+        return 0
+    # The release the branch is built on is the one the ledger has to cover.
+    release = _json(args.pins, {}).get("release")
+    if not release:
+        return _fail(["%s names no release" % args.pins])
+    try:
+        found = apicoverage.against(ledger, _surface(release, args.repo, upstream))
+    except (protoapi.ProtoError, upstream_module.UpstreamError) as err:
+        return _fail([str(err)])
+    lines = apicoverage.unclassified_report(found, release)
+    if release != ledger["release"]:
+        lines.insert(0, "the ledger is for OpenShell %s and this branch pins %s" % (ledger["release"], release))
+    if lines:
+        return _fail(["%s does not cover OpenShell %s:\n%s" % (args.ledger, release, "\n".join(lines))])
+    print("%s covers every user-facing RPC and request field of OpenShell %s" % (args.ledger, release))
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command")
@@ -311,6 +388,8 @@ def build_parser():
     p.add_argument("--dry-run", default="false", choices=flag)
     p.add_argument("--version", default="", help="bump to this release (no leading v) instead of the newest stable one")
     p.add_argument("--summary", default="", help="also write the summary here")
+    p.add_argument("--ledger", default=DEFAULT_LEDGER, help="the coverage ledger, for the report of what is new in the API")
+    p.add_argument("--root", default=".", help="the checkout whose source is searched for what the ledger does not list")
     p.add_argument("--out", required=True)
 
     p = add("bump", cmd_bump, "make main plus the pin move and decide what to publish")
@@ -346,6 +425,23 @@ def build_parser():
     p.add_argument("--repo-url", default="")
     p.add_argument("--dry-run", default="false", choices=flag)
     p.add_argument("--out", required=True)
+    p = add("api-diff", cmd_api_diff, "what is new in the gateway's user-facing API between two releases")
+    p.add_argument("--from", dest="old", required=True, help="the older release, without the v (0.1.5)")
+    p.add_argument("--to", dest="new", required=True, help="the newer release, without the v (0.1.6)")
+    p.add_argument("--repo", default="", help="a clone of upstream that has both tags; without it they are fetched")
+    p.add_argument("--ledger", default=DEFAULT_LEDGER)
+    p.add_argument("--root", default=".", help="the checkout whose source is searched for what the ledger does not list")
+    p.add_argument("--limit", type=int, default=0, help="cut each table at this many rows (0: every row)")
+    p.add_argument("--out", default="", help="also write the report here")
+
+    p = add("api-coverage", cmd_api_coverage, "check the coverage ledger and docs/api-coverage.md")
+    p.add_argument("--ledger", default=DEFAULT_LEDGER)
+    p.add_argument("--doc", default=DEFAULT_COVERAGE_DOC)
+    p.add_argument("--pins", default=DEFAULT_PINS)
+    p.add_argument("--write", action="store_true", help="rewrite the generated block of the document")
+    p.add_argument("--upstream", action="store_true", help="also compare the ledger with upstream's protos at the pinned release")
+    p.add_argument("--repo", default="", help="a clone of upstream that has the pinned tag; implies --upstream, without the network")
+
     return parser
 
 

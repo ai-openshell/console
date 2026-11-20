@@ -23,7 +23,7 @@ backend/            Go BFF; the compat suite is in test/compat/ (make compat, ne
   pkg/models/       Response DTOs (From*() converters) and request builders
 scripts/            Release and CI tooling (gateway-range.mjs, release/, retag-image.sh) and dev-env.sh (the local stack)
 deploy/             Dockerfile, Helm chart (helm/console), Keycloak realm (keycloak/), local stack (dev/), compat stack and gateway pins (ci/)
-docs/               Guides (install, authentication, configuration, compatibility, development, architecture, releasing) and ADRs (adrs/)
+docs/               Guides (install, authentication, configuration, compatibility, development, architecture, releasing), API coverage (api-coverage.md, made from deploy/ci/upstream/api-coverage.json) and ADRs (adrs/)
 ```
 
 ## Build and run
