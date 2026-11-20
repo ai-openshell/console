@@ -15,11 +15,17 @@ python3 deploy/ci/upstream/follow.py validate-pins        # check gateway-pins.j
 python3 deploy/ci/upstream/follow.py format-pins          # rewrite it in canonical form after a hand edit
 python3 deploy/ci/upstream/follow.py require-stable       # fail if it names a pre-release
 python3 deploy/ci/upstream/follow.py plan --out /tmp/plan.json   # what is upstream ahead of this branch?
+python3 deploy/ci/upstream/follow.py api-diff --from 0.1.5 --to 0.1.6   # what is new in the gateway's API?
+python3 deploy/ci/upstream/follow.py api-coverage               # is the coverage ledger well formed, and docs/api-coverage.md made from it?
+python3 deploy/ci/upstream/follow.py api-coverage --upstream    # does the ledger cover the pinned release?
 ```
 
 `plan` asks the real upstream (`git ls-remote` of NVIDIA/OpenShell and of
-ai-openshell/sdk-go, and `docker buildx imagetools inspect` for the target's
-image digests). It only reads; it starts nothing.
+ai-openshell/sdk-go, `docker buildx imagetools inspect` for the target's
+image digests, and a shallow clone of the pinned and the target tag for their
+`proto` directory). It only reads; it starts nothing. `api-diff` and
+`api-coverage --upstream` make the same clone, or read a clone you already
+have with `--repo`.
 
 ## The SDK
 
@@ -35,6 +41,40 @@ repository, `github.com/NVIDIA/OpenShell/sdk/go`. The pins check accepts a
 go.mod on either path, and the pin move takes a tree off the old one: it
 rewrites `backend/**/*.go` to the new import path before `go mod tidy`, and
 commits those files with the pin.
+
+## What is new in the API
+
+A release can add an RPC, a field or an enum value without breaking
+anything, and then nothing fails and nobody is told: suspend and resume came
+with 0.1.6 and were found by accident. So `plan` also compares the gateway's
+user-facing API at the pinned release and at the target, and the result goes
+where a person will read it: the bump pull request's description, the run
+summary, and check A's issue.
+
+- **What is compared.** `openshell.proto` and what it imports, at the two
+  tags. The RPCs that take a user's bearer (upstream writes who may call each
+  one in its `authorization` option: `bearer`, `dual` and `unauthenticated`
+  are kept; `sandbox`, `peer` and `operator` are listed apart), and every
+  message and enum one of them sends or returns. Added, removed and changed.
+- **Whether the dashboard has it.** Each new RPC and request field is looked
+  up in the coverage ledger, `api-coverage.json`, which says of every RPC and
+  every field a client can send how the UI offers it
+  ([docs/api-coverage.md](../../../docs/api-coverage.md) is made from it).
+  What the ledger does not list is searched for in `frontend/src` and
+  `backend/pkg`. A name that occurs is a hint; only the ledger says covered.
+- **It decides nothing.** A tag whose protos cannot be fetched, or a proto
+  the parser does not know, does not stop a bump or check A. The report then
+  says the comparison is missing, why, and the command that makes it by hand.
+- **The pull request's tables are cut** at 40 rows each, because GitHub
+  refuses a description over 65,536 characters. The run summary has every row.
+
+No copy of the protos is kept here (ADR 0003): they are read from upstream's
+tag each time.
+
+After a bump merges, the ledger is one release behind. `follow.py
+api-coverage --upstream` lists what the new release added that nobody has
+classified. No CI job runs it: the unit tests check only, with no network,
+that the ledger is well formed and that the document is made from it.
 
 ## One release per branch
 
@@ -72,6 +112,8 @@ It runs once a day, and when a person starts it.
    are resolved once, here, so the bump pins what check A tested. A scheduled
    run bumps only to a stable release; a run with a `version` bumps to that
    version, stable or pre-release.
+   It also compares the API of the pinned release with the target's
+   ([What is new in the API](#what-is-new-in-the-api)).
 2. **`bump`.** Make `bump/openshell-X.Y.Z`:
    - If that branch exists, or any pull request has ever come from it in this
      repository (open, closed or merged), do nothing.
@@ -220,11 +262,21 @@ but `main` is always one: it prints what it would push, open and edit.
 | `bump.py` | The bump branch's one commit: `main` plus the pin move, in a scratch worktree. |
 | `publish.py` | Whether the bump branch or a pull request from it exists already, and every step to take on GitHub (no token), and running those steps (token). |
 | `report.py` | The commit message, the pull request, check A's issue, the run summaries. |
+| `protoapi.py` | The gateway's API as upstream's `.proto` files state it: which RPCs a signed-in person may call, and what they send and return. |
+| `apidiff.py` | What differs between two releases' APIs, whether the dashboard has each new thing, and the report. |
+| `apicoverage.py` | The coverage ledger: its shape, what a release leaves unclassified, and the tables of `docs/api-coverage.md`. |
+| `api-coverage.json` | The ledger. Edited by hand when a feature lands. |
 | `follow.py` | The command line the workflows call. |
-| `tests/` | `support.py` has the stand-in tools and a throwaway git repository; `fixtures/upstream.json` is a subset of upstream's real tags with the real ghcr.io digests of 2026-10-09. |
+| `tests/` | `protos.py` is two small releases of an API shaped like upstream's; `support.py` has the stand-in tools and a throwaway git repository; `fixtures/upstream.json` is a subset of upstream's real tags with the real ghcr.io digests of 2026-10-09. |
 
 ## Not done
 
+- **A new RPC does not fail anything.** The report names it; nothing makes
+  anyone classify it. `api-coverage --upstream` could run on bump pull
+  requests and turn them red until the ledger covers the new release. It does
+  not: that is a decision about how much a bump should be held up.
+- **The API comparison reads protos, not behaviour.** A release that starts
+  refusing something the forms send, with no proto change, is not in it.
 - **A bump branch is never refreshed.** It is `main` as it was when the bot
   made it, plus whatever people pushed. A person rebases it.
 - **A silent drop is still invisible.** The compatibility suite proves what it

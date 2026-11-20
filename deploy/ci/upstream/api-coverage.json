@@ -1,0 +1,4283 @@
+{
+ "_comment": [
+  "What the dashboard does with each piece of the gateway's user-facing API (docs/api-coverage.md is made from this file).",
+  "",
+  "rpcs: every RPC a signed-in person may call at `release`. fields: every field of every message a client can send.",
+  "sdk / bff: whether the Go SDK and the BFF carry it. ui: how a person reaches it in the UI:",
+  "  form       a dedicated input, select, switch or checkbox",
+  "  action     a button or a flow runs it",
+  "  document   only by writing YAML or JSON in an editor, or choosing a file",
+  "  read-only  shown, cannot be set or called",
+  "  fixed      the dashboard always sends one value",
+  "  plumbing   not a person's to author: the workspace of the route, page tokens, concurrency and idempotency tokens",
+  "  none       the dashboard cannot send it or call it",
+  "where: the one place to look, path:line from the repository root. note: one sentence, only when something is partial or wrong.",
+  "",
+  "Edit this file when a feature lands or a gap closes, then run:",
+  "  python3 deploy/ci/upstream/follow.py api-coverage --write        # rewrite the tables in docs/api-coverage.md",
+  "  python3 deploy/ci/upstream/follow.py api-coverage --upstream     # is anything of the pinned release unclassified?",
+  "The Follow upstream workflow reads it to say, of each thing a new release adds, whether the dashboard has it."
+ ],
+ "release": "0.1.9",
+ "groups": [
+  {
+   "id": "workspaces",
+   "title": "Workspaces, members and the gateway",
+   "rpcs": [
+    "OpenShell.CreateWorkspace",
+    "OpenShell.GetWorkspace",
+    "OpenShell.ListWorkspaces",
+    "OpenShell.DeleteWorkspace",
+    "OpenShell.AddWorkspaceMember",
+    "OpenShell.RemoveWorkspaceMember",
+    "OpenShell.ListWorkspaceMembers",
+    "OpenShell.Health",
+    "OpenShell.GetCurrentUser",
+    "OpenShell.GetGatewayInfo"
+   ]
+  },
+  {
+   "id": "sandboxes",
+   "title": "Sandboxes and sandbox templates",
+   "rpcs": [
+    "OpenShell.CreateSandbox",
+    "OpenShell.GetSandbox",
+    "OpenShell.ListSandboxes",
+    "OpenShell.DeleteSandbox",
+    "OpenShell.StopSandbox",
+    "OpenShell.StartSandbox",
+    "OpenShell.SuspendSandbox",
+    "OpenShell.ResumeSandbox",
+    "SandboxUpdates.UpdateSandbox",
+    "OpenShell.BeginRootfsTarStaging",
+    "OpenShell.CreateSandboxTemplate",
+    "OpenShell.GetSandboxTemplate",
+    "OpenShell.ListSandboxTemplates",
+    "OpenShell.DeleteSandboxTemplate"
+   ]
+  },
+  {
+   "id": "runtime",
+   "title": "Terminal, files, logs and services",
+   "rpcs": [
+    "OpenShell.ExecSandbox",
+    "OpenShell.ExecSandboxInteractive",
+    "OpenShell.CreateSshSession",
+    "OpenShell.RevokeSshSession",
+    "OpenShell.ForwardTcp",
+    "OpenShell.GetSandboxLogs",
+    "OpenShell.WatchSandbox",
+    "OpenShell.ExposeService",
+    "OpenShell.GetService",
+    "OpenShell.ListServices",
+    "OpenShell.DeleteService",
+    "ServiceDiscovery.GetServiceRouteSnapshot",
+    "ServiceDiscovery.WatchServiceRoutes"
+   ]
+  },
+  {
+   "id": "providers",
+   "title": "Providers and credential refresh",
+   "rpcs": [
+    "OpenShell.CreateProvider",
+    "OpenShell.GetProvider",
+    "OpenShell.ListProviders",
+    "OpenShell.UpdateProvider",
+    "OpenShell.DeleteProvider",
+    "OpenShell.ConfigureProviderRefresh",
+    "OpenShell.GetProviderRefreshStatus",
+    "OpenShell.RotateProviderCredential",
+    "OpenShell.DeleteProviderRefresh",
+    "OpenShell.AttachSandboxProvider",
+    "OpenShell.DetachSandboxProvider",
+    "OpenShell.ListSandboxProviders",
+    "OpenShell.GetSandboxProviderStatus"
+   ]
+  },
+  {
+   "id": "profiles",
+   "title": "Provider profiles",
+   "about": "A profile's `endpoints` are `NetworkEndpoint` messages, the same as a policy's. Their rows under Policy describe the sandbox policy editors; what the Create profile form can set of an endpoint is in the section on that form above.",
+   "rpcs": [
+    "OpenShell.ListProviderProfiles",
+    "OpenShell.GetProviderProfile",
+    "OpenShell.ImportProviderProfiles",
+    "OpenShell.LintProviderProfiles",
+    "OpenShell.UpdateProviderProfiles",
+    "OpenShell.DeleteProviderProfile"
+   ]
+  },
+  {
+   "id": "policy",
+   "title": "Policy, settings and proposals",
+   "about": "The `NetworkEndpoint` rows describe the sandbox policy editors: the rule view (add an endpoint, add a rule, remove) and the document editor.",
+   "rpcs": [
+    "OpenShell.GetSandboxConfig",
+    "OpenShell.UpdateConfig",
+    "OpenShell.GetGatewayConfig",
+    "OpenShell.ListSandboxPolicies",
+    "OpenShell.GetSandboxPolicyStatus",
+    "OpenShell.GetDraftPolicy",
+    "OpenShell.ApproveDraftChunk",
+    "OpenShell.RejectDraftChunk",
+    "OpenShell.ApproveAllDraftChunks",
+    "OpenShell.EditDraftChunk",
+    "OpenShell.UndoDraftChunk",
+    "OpenShell.ClearDraftChunks",
+    "OpenShell.GetDraftHistory"
+   ]
+  }
+ ],
+ "messages": {
+  "openshell.datamodel.v1.AllWorkspaces": "workspaces",
+  "openshell.datamodel.v1.CredentialHandle": "providers",
+  "openshell.datamodel.v1.ObjectMeta": "workspaces",
+  "openshell.datamodel.v1.Provider": "providers",
+  "openshell.datamodel.v1.WorkspaceSelector": "workspaces",
+  "openshell.sandbox.v1.FilesystemPolicy": "policy",
+  "openshell.sandbox.v1.GetGatewayConfigRequest": "policy",
+  "openshell.sandbox.v1.GetSandboxConfigRequest": "policy",
+  "openshell.sandbox.v1.GraphqlOperation": "policy",
+  "openshell.sandbox.v1.L7Allow": "policy",
+  "openshell.sandbox.v1.L7DenyRule": "policy",
+  "openshell.sandbox.v1.L7QueryMatcher": "policy",
+  "openshell.sandbox.v1.L7Rule": "policy",
+  "openshell.sandbox.v1.LandlockPolicy": "policy",
+  "openshell.sandbox.v1.McpOptions": "policy",
+  "openshell.sandbox.v1.MiddlewareEndpointSelector": "policy",
+  "openshell.sandbox.v1.NetworkBinary": "policy",
+  "openshell.sandbox.v1.NetworkCredentialBinding": "policy",
+  "openshell.sandbox.v1.NetworkEndpoint": "policy",
+  "openshell.sandbox.v1.NetworkMiddlewareConfig": "policy",
+  "openshell.sandbox.v1.NetworkPolicyRule": "policy",
+  "openshell.sandbox.v1.ProcessPolicy": "policy",
+  "openshell.sandbox.v1.SandboxPolicy": "policy",
+  "openshell.sandbox.v1.SettingValue": "policy",
+  "openshell.v1.AddAllowRules": "policy",
+  "openshell.v1.AddDenyRules": "policy",
+  "openshell.v1.AddNetworkRule": "policy",
+  "openshell.v1.AddWorkspaceMemberRequest": "workspaces",
+  "openshell.v1.ApproveAllDraftChunksRequest": "policy",
+  "openshell.v1.ApproveDraftChunkRequest": "policy",
+  "openshell.v1.AttachSandboxProviderRequest": "providers",
+  "openshell.v1.BeginRootfsTarStagingRequest": "sandboxes",
+  "openshell.v1.ClearDraftChunksRequest": "policy",
+  "openshell.v1.ConfigureProviderRefreshRequest": "providers",
+  "openshell.v1.CreateProviderRequest": "providers",
+  "openshell.v1.CreateSandboxRequest": "sandboxes",
+  "openshell.v1.CreateSandboxTemplateRequest": "sandboxes",
+  "openshell.v1.CreateSshSessionRequest": "runtime",
+  "openshell.v1.CreateWorkspaceRequest": "workspaces",
+  "openshell.v1.DeleteProviderProfileRequest": "profiles",
+  "openshell.v1.DeleteProviderRefreshRequest": "providers",
+  "openshell.v1.DeleteProviderRequest": "providers",
+  "openshell.v1.DeleteSandboxRequest": "sandboxes",
+  "openshell.v1.DeleteSandboxTemplateRequest": "sandboxes",
+  "openshell.v1.DeleteServiceRequest": "runtime",
+  "openshell.v1.DeleteWorkspaceRequest": "workspaces",
+  "openshell.v1.DetachSandboxProviderRequest": "providers",
+  "openshell.v1.DraftChunkApproval": "policy",
+  "openshell.v1.EditDraftChunkRequest": "policy",
+  "openshell.v1.ExecSandboxInput": "runtime",
+  "openshell.v1.ExecSandboxRequest": "runtime",
+  "openshell.v1.ExecSandboxWindowResize": "runtime",
+  "openshell.v1.ExposeServiceRequest": "runtime",
+  "openshell.v1.GetCurrentUserRequest": "workspaces",
+  "openshell.v1.GetDraftHistoryRequest": "policy",
+  "openshell.v1.GetDraftPolicyRequest": "policy",
+  "openshell.v1.GetGatewayInfoRequest": "workspaces",
+  "openshell.v1.GetProviderProfileRequest": "profiles",
+  "openshell.v1.GetProviderRefreshStatusRequest": "providers",
+  "openshell.v1.GetProviderRequest": "providers",
+  "openshell.v1.GetSandboxLogsRequest": "runtime",
+  "openshell.v1.GetSandboxPolicyStatusRequest": "policy",
+  "openshell.v1.GetSandboxProviderStatusRequest": "providers",
+  "openshell.v1.GetSandboxRequest": "sandboxes",
+  "openshell.v1.GetSandboxTemplateRequest": "sandboxes",
+  "openshell.v1.GetServiceRequest": "runtime",
+  "openshell.v1.GetServiceRouteSnapshotRequest": "runtime",
+  "openshell.v1.GetWorkspaceRequest": "workspaces",
+  "openshell.v1.GpuResourceRequirements": "sandboxes",
+  "openshell.v1.HealthRequest": "workspaces",
+  "openshell.v1.ImportProviderProfilesRequest": "profiles",
+  "openshell.v1.L7RuleTarget": "policy",
+  "openshell.v1.LintProviderProfilesRequest": "profiles",
+  "openshell.v1.ListProviderProfilesRequest": "profiles",
+  "openshell.v1.ListProvidersRequest": "providers",
+  "openshell.v1.ListSandboxPoliciesRequest": "policy",
+  "openshell.v1.ListSandboxProvidersRequest": "providers",
+  "openshell.v1.ListSandboxTemplatesRequest": "sandboxes",
+  "openshell.v1.ListSandboxesRequest": "sandboxes",
+  "openshell.v1.ListServicesRequest": "runtime",
+  "openshell.v1.ListWorkspaceMembersRequest": "workspaces",
+  "openshell.v1.ListWorkspacesRequest": "workspaces",
+  "openshell.v1.PolicyMergeOperation": "policy",
+  "openshell.v1.ProviderCredentialRefresh": "profiles",
+  "openshell.v1.ProviderCredentialRefreshMaterial": "profiles",
+  "openshell.v1.ProviderCredentialRefreshOutput": "profiles",
+  "openshell.v1.ProviderCredentialTokenGrant": "profiles",
+  "openshell.v1.ProviderCredentialTokenGrantAudienceOverride": "profiles",
+  "openshell.v1.ProviderCredentialTokenGrantSubjectToken": "profiles",
+  "openshell.v1.ProviderProfile": "profiles",
+  "openshell.v1.ProviderProfileCredential": "profiles",
+  "openshell.v1.ProviderProfileDiscovery": "profiles",
+  "openshell.v1.ProviderProfileFile": "profiles",
+  "openshell.v1.ProviderProfileImportItem": "profiles",
+  "openshell.v1.RejectDraftChunkRequest": "policy",
+  "openshell.v1.RemoveNetworkBinary": "policy",
+  "openshell.v1.RemoveNetworkEndpoint": "policy",
+  "openshell.v1.RemoveNetworkRule": "policy",
+  "openshell.v1.RemoveWorkspaceMemberRequest": "workspaces",
+  "openshell.v1.ResourceRequirements": "sandboxes",
+  "openshell.v1.ResumeSandboxRequest": "sandboxes",
+  "openshell.v1.RevokeSshSessionRequest": "runtime",
+  "openshell.v1.RotateProviderCredentialRequest": "providers",
+  "openshell.v1.SandboxCommandUpdate": "sandboxes",
+  "openshell.v1.SandboxMapUpdate": "sandboxes",
+  "openshell.v1.SandboxResources": "sandboxes",
+  "openshell.v1.SandboxServiceExposure": "sandboxes",
+  "openshell.v1.SandboxServiceLevel": "sandboxes",
+  "openshell.v1.SandboxSpec": "sandboxes",
+  "openshell.v1.SandboxStartup": "sandboxes",
+  "openshell.v1.SandboxTemplate": "sandboxes",
+  "openshell.v1.SandboxWorkloadConfig": "sandboxes",
+  "openshell.v1.SandboxWorkloadTemplate": "sandboxes",
+  "openshell.v1.SandboxWorkloadTemplateSpec": "sandboxes",
+  "openshell.v1.SshRelayTarget": "runtime",
+  "openshell.v1.StartSandboxRequest": "sandboxes",
+  "openshell.v1.StopSandboxRequest": "sandboxes",
+  "openshell.v1.SuspendSandboxRequest": "sandboxes",
+  "openshell.v1.TcpForwardFrame": "runtime",
+  "openshell.v1.TcpForwardInit": "runtime",
+  "openshell.v1.TcpRelayTarget": "runtime",
+  "openshell.v1.UndoDraftChunkRequest": "policy",
+  "openshell.v1.UpdateConfigRequest": "policy",
+  "openshell.v1.UpdateProviderProfilesRequest": "profiles",
+  "openshell.v1.UpdateProviderRequest": "providers",
+  "openshell.v1.UpdateSandboxRequest": "sandboxes",
+  "openshell.v1.WatchSandboxRequest": "runtime",
+  "openshell.v1.WatchServiceRoutesRequest": "runtime"
+ },
+ "rpcs": {
+  "OpenShell.AddWorkspaceMember": {
+   "bff": "POST /api/v1/workspaces/{workspace}/members",
+   "note": "",
+   "sdk": "Workspaces().AddMember",
+   "ui": "form",
+   "where": "frontend/src/components/AddMemberModal.tsx:59"
+  },
+  "OpenShell.ApproveAllDraftChunks": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes/{name}/drafts/approve-all",
+   "note": "",
+   "sdk": "Policy().ApproveAllDraftChunks",
+   "ui": "form",
+   "where": "frontend/src/components/SandboxDraftsTab/index.tsx:302"
+  },
+  "OpenShell.ApproveDraftChunk": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes/{name}/drafts/{chunk}/approve",
+   "note": "",
+   "sdk": "Policy().ApproveDraftChunk",
+   "ui": "action",
+   "where": "frontend/src/components/SandboxDraftsTab/DraftChunkRow.tsx:156"
+  },
+  "OpenShell.AttachSandboxProvider": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes/{name}/providers/{provider}",
+   "note": "Runs without expected_resource_version although the component's comment (line 36) says it passes one.",
+   "sdk": "Sandboxes().AttachProvider",
+   "ui": "action",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:106"
+  },
+  "OpenShell.BeginRootfsTarStaging": {
+   "bff": "none",
+   "note": "Used by the CLI's `sandbox create --from <rootfs tar>` for the VM driver on local gateways only; the client must then write the archive to a path on the gateway host, which a browser cannot do.",
+   "sdk": "generated client only",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:216"
+  },
+  "OpenShell.ClearDraftChunks": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes/{name}/drafts/clear",
+   "note": "",
+   "sdk": "Policy().ClearDraftChunks",
+   "ui": "action",
+   "where": "frontend/src/components/SandboxDraftsTab/index.tsx:320"
+  },
+  "OpenShell.ConfigureProviderRefresh": {
+   "bff": "POST /api/v1/workspaces/{workspace}/providers/{name}/refresh",
+   "note": "",
+   "sdk": "Providers().Refresh().Configure",
+   "ui": "form",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:470"
+  },
+  "OpenShell.CreateProvider": {
+   "bff": "POST /api/v1/workspaces/{workspace}/providers",
+   "note": "Form sends name, type, profileWorkspace, credentials and config; labels, annotations and credential expiry cannot be set at create.",
+   "sdk": "Providers().Create",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:292"
+  },
+  "OpenShell.CreateSandbox": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes; POST /api/v1/workspaces/{workspace}/sandboxes/from-template",
+   "note": "Two forms: Create sandbox (inline workload) and Create sandbox from a template row (TemplatesTab.tsx:310).",
+   "sdk": "Sandboxes().Create; Client.CreateSandboxFromTemplate when a workload template is named",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:78"
+  },
+  "OpenShell.CreateSandboxTemplate": {
+   "bff": "POST /api/v1/workspaces/{workspace}/templates",
+   "note": "Button shown to workspace admins only (TemplatesTab.tsx:212).",
+   "sdk": "SandboxTemplates().Create",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:150"
+  },
+  "OpenShell.CreateSshSession": {
+   "bff": "none",
+   "note": "The Connect card only prints `openshell sandbox connect` and `ssh-config` commands to copy; nothing calls the RPC.",
+   "sdk": "SSH().CreateSession",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:96"
+  },
+  "OpenShell.CreateWorkspace": {
+   "bff": "POST /api/v1/workspaces",
+   "note": "",
+   "sdk": "Workspaces().Create",
+   "ui": "form",
+   "where": "frontend/src/components/CreateWorkspaceModal.tsx:63"
+  },
+  "OpenShell.DeleteProvider": {
+   "bff": "DELETE /api/v1/workspaces/{workspace}/providers/{name}",
+   "note": "",
+   "sdk": "Providers().Delete",
+   "ui": "action",
+   "where": "frontend/src/pages/ProviderListPage.tsx:108"
+  },
+  "OpenShell.DeleteProviderProfile": {
+   "bff": "DELETE .../provider-profiles/{profileId}",
+   "note": "",
+   "sdk": "Profiles().Delete",
+   "ui": "action",
+   "where": "frontend/src/components/provider/ProfilesPanel.tsx:323"
+  },
+  "OpenShell.DeleteProviderRefresh": {
+   "bff": "DELETE /api/v1/workspaces/{workspace}/providers/{name}/refresh?credentialKey=",
+   "note": "",
+   "sdk": "Providers().Refresh().Delete",
+   "ui": "action",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:495"
+  },
+  "OpenShell.DeleteSandbox": {
+   "bff": "DELETE /api/v1/workspaces/{workspace}/sandboxes/{name}",
+   "note": "Also row and bulk delete on the list page.",
+   "sdk": "Sandboxes().Delete",
+   "ui": "action",
+   "where": "frontend/src/pages/SandboxDetailPage.tsx:257"
+  },
+  "OpenShell.DeleteSandboxTemplate": {
+   "bff": "DELETE /api/v1/workspaces/{workspace}/templates/{name}",
+   "note": "Row action shown to workspace admins only.",
+   "sdk": "SandboxTemplates().Delete",
+   "ui": "action",
+   "where": "frontend/src/components/TemplatesTab.tsx:166"
+  },
+  "OpenShell.DeleteService": {
+   "bff": "DELETE /api/v1/workspaces/{workspace}/sandboxes/{name}/services/{svc}, DELETE /api/v1/workspaces/{workspace}/sandboxes/{name}/services (unnamed endpoint)",
+   "note": "",
+   "sdk": "Services().Delete",
+   "ui": "action",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:182"
+  },
+  "OpenShell.DeleteWorkspace": {
+   "bff": "DELETE /api/v1/workspaces/{workspace}",
+   "note": "",
+   "sdk": "Workspaces().Delete",
+   "ui": "action",
+   "where": "frontend/src/pages/WorkspaceListPage.tsx:136"
+  },
+  "OpenShell.DetachSandboxProvider": {
+   "bff": "DELETE /api/v1/workspaces/{workspace}/sandboxes/{name}/providers/{provider}",
+   "note": "Runs without expected_resource_version: the client's del() sends no body.",
+   "sdk": "Sandboxes().DetachProvider",
+   "ui": "action",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:155"
+  },
+  "OpenShell.EditDraftChunk": {
+   "bff": "PUT /api/v1/workspaces/{workspace}/sandboxes/{name}/drafts/{chunk}",
+   "note": "The proposed rule is edited as protojson in a text area; no form and no YAML.",
+   "sdk": "Policy().EditDraftChunk",
+   "ui": "document",
+   "where": "frontend/src/components/SandboxDraftsTab/EditDraftModal.tsx:104"
+  },
+  "OpenShell.ExecSandbox": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes/{name}/files (mkdir -p), GET /api/v1/workspaces/{workspace}/sandboxes/{name}/files (stat, then cat or tar)",
+   "note": "Only behind file transfer with commands the BFF chooses; no route runs a one-shot command of the user's own without a TTY.",
+   "sdk": "Exec().Run, Exec().Stream",
+   "ui": "action",
+   "where": "frontend/src/components/sandbox/SandboxFilesTab.tsx:252"
+  },
+  "OpenShell.ExecSandboxInteractive": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes/{name}/terminal (WebSocket); POST /api/v1/workspaces/{workspace}/sandboxes/{name}/files via direct gRPC (rawexec.go, tty=false)",
+   "note": "",
+   "sdk": "Exec().Interactive",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:149"
+  },
+  "OpenShell.ExposeService": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes/{name}/services",
+   "note": "Create-or-update on the gateway: exposing an existing name again rewrites it, authorization mode included.",
+   "sdk": "Services().Expose",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:83"
+  },
+  "OpenShell.ForwardTcp": {
+   "bff": "none",
+   "note": "The Connect card prints `openshell forward start` commands with a port input; nothing calls the RPC.",
+   "sdk": "TCP().Forward, TCP().Listen, SSH().Tunnel",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "OpenShell.GetCurrentUser": {
+   "bff": "GET /api/v1/auth/whoami",
+   "note": "With AUTH_DISABLED the BFF answers a synthetic dev-user and does not call the gateway.",
+   "sdk": "Health().GetCurrentUser",
+   "ui": "read-only",
+   "where": "frontend/src/components/CurrentUserModal.tsx:64"
+  },
+  "OpenShell.GetDraftHistory": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes/{name}/drafts/history",
+   "note": "",
+   "sdk": "Policy().GetDraftHistory",
+   "ui": "read-only",
+   "where": "frontend/src/components/SandboxDraftsTab/DraftHistorySection.tsx:26"
+  },
+  "OpenShell.GetDraftPolicy": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes/{name}/drafts; also behind GET /api/v1/draft-summary and GET /api/v1/workspaces/{workspace}/draft-summary",
+   "note": "",
+   "sdk": "Policy().GetDraft",
+   "ui": "read-only",
+   "where": "frontend/src/components/SandboxDraftsTab/index.tsx:57"
+  },
+  "OpenShell.GetGatewayConfig": {
+   "bff": "GET /api/v1/settings/global",
+   "note": "",
+   "sdk": "Config().GetGateway",
+   "ui": "read-only",
+   "where": "frontend/src/pages/SettingsPage.tsx:70"
+  },
+  "OpenShell.GetGatewayInfo": {
+   "bff": "GET /api/v1/gateway",
+   "note": "",
+   "sdk": "Health().GetGatewayInfo",
+   "ui": "read-only",
+   "where": "frontend/src/pages/GatewayOverviewPage.tsx:318"
+  },
+  "OpenShell.GetProvider": {
+   "bff": "GET /api/v1/workspaces/{workspace}/providers/{name} (plus direct gRPC, rawprovider.go, for the credential keys)",
+   "note": "",
+   "sdk": "Providers().Get",
+   "ui": "read-only",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:82"
+  },
+  "OpenShell.GetProviderProfile": {
+   "bff": "GET .../provider-profiles/{profileId} — direct gRPC (rawprofile.go)",
+   "note": "Read for the export and for the profile a provider was made from.",
+   "sdk": "Profiles().Get (not used)",
+   "ui": "read-only",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:57"
+  },
+  "OpenShell.GetProviderRefreshStatus": {
+   "bff": "GET /api/v1/workspaces/{workspace}/providers/{name}/refresh-status",
+   "note": "Always read for the whole provider (credential_key empty).",
+   "sdk": "Providers().Refresh().GetStatus",
+   "ui": "read-only",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:84"
+  },
+  "OpenShell.GetSandbox": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes/{name}",
+   "note": "Polled by the sandbox detail page.",
+   "sdk": "Sandboxes().Get",
+   "ui": "action",
+   "where": "frontend/src/pages/SandboxDetailPage.tsx:74"
+  },
+  "OpenShell.GetSandboxConfig": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes/{name}/settings; GET /api/v1/workspaces/{workspace}/sandboxes/{name}/policy/effective",
+   "note": "",
+   "sdk": "Config().GetSandbox",
+   "ui": "read-only",
+   "where": "frontend/src/components/sandbox/SandboxSettingsTab.tsx:101"
+  },
+  "OpenShell.GetSandboxLogs": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes/{name}/logs",
+   "note": "Called only as the fallback after the live stream fails or ends; the Logs tab starts on WatchSandbox.",
+   "sdk": "Sandboxes().GetLogs",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:118"
+  },
+  "OpenShell.GetSandboxPolicyStatus": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes/{name}/policy; GET /api/v1/workspaces/{workspace}/sandboxes/{name}/policy/revisions/{version}; GET /api/v1/global-policy; GET /api/v1/global-policy/revisions/{version}",
+   "note": "The sandbox revisions/{version} route has no UI caller (getSandboxPolicyRevision in api/policy.ts is unused).",
+   "sdk": "Policy().GetStatus",
+   "ui": "read-only",
+   "where": "frontend/src/components/PolicyRuleEditor/index.tsx:74"
+  },
+  "OpenShell.GetSandboxProviderStatus": {
+   "bff": "none",
+   "note": "No wrapper, route or UI: the dashboard cannot tell whether an attach, detach or provider update has reached a sandbox, and the SDK also drops the receipt those responses carry.",
+   "sdk": "generated client only",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:228"
+  },
+  "OpenShell.GetSandboxTemplate": {
+   "bff": "GET /api/v1/workspaces/{workspace}/templates/{name}",
+   "note": "Route and useTemplate hook exist but no component calls them; the Templates tab renders everything from the list.",
+   "sdk": "SandboxTemplates().Get",
+   "ui": "none",
+   "where": "frontend/src/api/templates.ts:68"
+  },
+  "OpenShell.GetService": {
+   "bff": "none",
+   "note": "No route; the UI reads endpoints through ListServices only.",
+   "sdk": "Services().Get",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:247"
+  },
+  "OpenShell.GetWorkspace": {
+   "bff": "GET /api/v1/workspaces/{workspace}",
+   "note": "",
+   "sdk": "Workspaces().Get",
+   "ui": "read-only",
+   "where": "frontend/src/pages/WorkspaceDetailPage.tsx:67"
+  },
+  "OpenShell.Health": {
+   "bff": "GET /api/v1/gateway/compatibility; GET /api/v1/readyz (public probe)",
+   "note": "Shown as the masthead's gateway status and the release-line verdict.",
+   "sdk": "Health().Check",
+   "ui": "read-only",
+   "where": "frontend/src/components/GatewayStatusIndicator.tsx:95"
+  },
+  "OpenShell.ImportProviderProfiles": {
+   "bff": "POST .../provider-profiles — direct gRPC (rawprofile.go)",
+   "note": "BROKEN: the form's body is refused by the gateway whenever it has both a credential and an endpoint (measured on 0.1.6, same rule in source at 0.1.9). Importing a YAML or JSON file works (frontend/src/components/provider/ProfileFileModal.tsx).",
+   "sdk": "Profiles().Import (not used)",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:104"
+  },
+  "OpenShell.LintProviderProfiles": {
+   "bff": "POST .../provider-profiles/lint — direct gRPC (rawprofile.go)",
+   "note": "Run on every file chosen for import. The Create profile form does not lint: it imports and shows the refusal.",
+   "sdk": "Profiles().Lint (not used)",
+   "ui": "action",
+   "where": "frontend/src/components/provider/ProfileFileModal.tsx:105"
+  },
+  "OpenShell.ListProviderProfiles": {
+   "bff": "GET /api/v1/workspaces/{workspace}/provider-profiles and /api/v1/provider-profiles (platform) — direct gRPC (rawprofile.go)",
+   "note": "The SDK's Profiles() client exists, but its endpoint type keeps host, port and protocol only, so the BFF calls the generated client (rawprofile.go, hard fact 24).",
+   "sdk": "Profiles().List (not used)",
+   "ui": "read-only",
+   "where": "frontend/src/components/provider/ProfilesPanel.tsx:236"
+  },
+  "OpenShell.ListProviders": {
+   "bff": "GET /api/v1/workspaces/{workspace}/providers; GET /api/v1/providers (all workspaces); plus direct gRPC (rawprovider.go, rawprovider_allworkspaces.go) for the credential keys",
+   "note": "No label selector and no paging reach the browser; the SDK's provider List drops ListOptions.LabelSelector.",
+   "sdk": "Providers().ListAll",
+   "ui": "read-only",
+   "where": "frontend/src/pages/ProviderListPage.tsx:82"
+  },
+  "OpenShell.ListSandboxPolicies": {
+   "bff": "GET /api/v1/global-policy",
+   "note": "Called for the global scope only; a sandbox's history is read with one GetSandboxPolicyStatus per version instead.",
+   "sdk": "Policy().ListAll",
+   "ui": "read-only",
+   "where": "frontend/src/pages/GlobalPolicyPage.tsx:62"
+  },
+  "OpenShell.ListSandboxProviders": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes/{name}/providers (plus direct gRPC, rawprovider.go, for the credential keys)",
+   "note": "",
+   "sdk": "Sandboxes().ListAllProviders",
+   "ui": "read-only",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:42"
+  },
+  "OpenShell.ListSandboxTemplates": {
+   "bff": "GET /api/v1/workspaces/{workspace}/templates; GET /api/v1/templates (all workspaces)",
+   "note": "",
+   "sdk": "SandboxTemplates().ListAll",
+   "ui": "action",
+   "where": "frontend/src/components/TemplatesTab.tsx:89"
+  },
+  "OpenShell.ListSandboxes": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes; GET /api/v1/sandboxes (all workspaces)",
+   "note": "",
+   "sdk": "Sandboxes().List (paged) / ListAll",
+   "ui": "action",
+   "where": "frontend/src/pages/SandboxListPage.tsx:168"
+  },
+  "OpenShell.ListServices": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes/{name}/services, GET /api/v1/workspaces/{workspace}/services, GET /api/v1/services (all workspaces)",
+   "note": "",
+   "sdk": "Services().ListAll",
+   "ui": "action",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:59"
+  },
+  "OpenShell.ListWorkspaceMembers": {
+   "bff": "GET /api/v1/workspaces/{workspace}/members",
+   "note": "",
+   "sdk": "Workspaces().ListAllMembers",
+   "ui": "read-only",
+   "where": "frontend/src/pages/MemberListPage.tsx:48"
+  },
+  "OpenShell.ListWorkspaces": {
+   "bff": "GET /api/v1/workspaces",
+   "note": "",
+   "sdk": "Workspaces().List (paged) and Workspaces().ListAll",
+   "ui": "read-only",
+   "where": "frontend/src/pages/WorkspaceListPage.tsx:108"
+  },
+  "OpenShell.RejectDraftChunk": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes/{name}/drafts/{chunk}/reject",
+   "note": "",
+   "sdk": "Policy().RejectDraftChunk",
+   "ui": "form",
+   "where": "frontend/src/components/SandboxDraftsTab/DraftChunkRow.tsx:229"
+  },
+  "OpenShell.RemoveWorkspaceMember": {
+   "bff": "DELETE /api/v1/workspaces/{workspace}/members/{subject}",
+   "note": "",
+   "sdk": "Workspaces().RemoveMember",
+   "ui": "action",
+   "where": "frontend/src/pages/MemberListPage.tsx:195"
+  },
+  "OpenShell.ResumeSandbox": {
+   "bff": "none",
+   "note": "No route or UI: a sandbox suspended with the CLI cannot be resumed from the dashboard.",
+   "sdk": "SandboxSuspendResume().Resume",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:221"
+  },
+  "OpenShell.RevokeSshSession": {
+   "bff": "none",
+   "note": "",
+   "sdk": "SSH().RevokeSession",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:96"
+  },
+  "OpenShell.RotateProviderCredential": {
+   "bff": "POST /api/v1/workspaces/{workspace}/providers/{name}/refresh/rotate",
+   "note": "",
+   "sdk": "Providers().Refresh().Rotate",
+   "ui": "action",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:350"
+  },
+  "OpenShell.StartSandbox": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes/{name}/start",
+   "note": "Offered only for STOPPED and COMPLETED (frontend/src/utils/sandboxLifecycle.ts:12); gateway 0.1.9 also starts a Suspended sandbox (discarding its memory state) and one in Error after a failed main process.",
+   "sdk": "Sandboxes().Start",
+   "ui": "action",
+   "where": "frontend/src/pages/SandboxDetailPage.tsx:193"
+  },
+  "OpenShell.StopSandbox": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes/{name}/stop",
+   "note": "Offered only in READY (frontend/src/utils/sandboxLifecycle.ts:9); gateway 0.1.9 also stops Completed, Error, Suspending and Suspended sandboxes, and tells the caller to stop an Error sandbox before starting it.",
+   "sdk": "Sandboxes().Stop",
+   "ui": "action",
+   "where": "frontend/src/pages/SandboxDetailPage.tsx:212"
+  },
+  "OpenShell.SuspendSandbox": {
+   "bff": "none",
+   "note": "No route, handler, API function or button; SUSPENDING/SUSPENDED are not in the frontend SandboxPhase type and render as an unstyled grey label with Stop disabled and no Start.",
+   "sdk": "SandboxSuspendResume().Suspend",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:220"
+  },
+  "OpenShell.UndoDraftChunk": {
+   "bff": "POST /api/v1/workspaces/{workspace}/sandboxes/{name}/drafts/{chunk}/undo",
+   "note": "",
+   "sdk": "Policy().UndoDraftChunk",
+   "ui": "action",
+   "where": "frontend/src/components/SandboxDraftsTab/DraftChunkRow.tsx:185"
+  },
+  "OpenShell.UpdateConfig": {
+   "bff": "PUT /api/v1/workspaces/{workspace}/sandboxes/{name}/policy; POST /api/v1/workspaces/{workspace}/sandboxes/{name}/policy/merge; PUT, DELETE /api/v1/workspaces/{workspace}/sandboxes/{name}/settings; PUT, DELETE /api/v1/global-policy; PUT, DELETE /api/v1/settings/global",
+   "note": "Network rules go by form as merge operations, settings by form, whole policies (sandbox and global) by document only; annotations and request_id are never sent.",
+   "sdk": "Config().Update",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/index.tsx:118"
+  },
+  "OpenShell.UpdateProvider": {
+   "bff": "PUT /api/v1/workspaces/{workspace}/providers/{name}",
+   "note": "Edit form can add or replace credential values, set expiries and change config; it cannot remove a credential, clear an expiry or send the provider's resource_version.",
+   "sdk": "Providers().Update",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:276"
+  },
+  "OpenShell.UpdateProviderProfiles": {
+   "bff": "PUT .../provider-profiles/{profileId} — direct gRPC (rawprofile.go)",
+   "note": "Update is from a file only (export, edit on disk, choose the file): there is no edit form and no in-browser editor.",
+   "sdk": "Profiles().Update (not used)",
+   "ui": "document",
+   "where": "frontend/src/components/provider/ProfileFileModal.tsx:216"
+  },
+  "OpenShell.WatchSandbox": {
+   "bff": "GET /api/v1/workspaces/{workspace}/sandboxes/{name}/logs/stream (SSE) via direct gRPC (rawlogs.go)",
+   "note": "Log lines and warnings only: the relay drops status snapshots and never asks for platform events; rawlogs.go is a fourth direct gRPC call that the rules do not list and whose stated gap SDK v0.1.9 closes with WatchLogs.",
+   "sdk": "Sandboxes().Watch (status only), SandboxLogsWatch().WatchLogs (logs and platform events)",
+   "ui": "action",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:175"
+  },
+  "SandboxUpdates.UpdateSandbox": {
+   "bff": "none",
+   "note": "Separate gRPC service (pb.NewSandboxUpdatesClient) with no SDK wrapper; nothing in the dashboard changes a sandbox's image, command, environment, labels or annotations after create.",
+   "sdk": "generated client only",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "ServiceDiscovery.GetServiceRouteSnapshot": {
+   "bff": "none",
+   "note": "No SDK wrapper, no route, no UI for a workspace's installed application routes.",
+   "sdk": "generated client only",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:247"
+  },
+  "ServiceDiscovery.WatchServiceRoutes": {
+   "bff": "none",
+   "note": "",
+   "sdk": "generated client only",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:247"
+  }
+ },
+ "fields": {
+  "openshell.datamodel.v1.CredentialHandle.driver": {
+   "bff": "no",
+   "note": "Gateway-internal: the gateway refuses a create or update that supplies credential_handles and clears them on every read, so there is nothing to author.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/providers_handler.go:150"
+  },
+  "openshell.datamodel.v1.CredentialHandle.handle": {
+   "bff": "no",
+   "note": "Gateway-internal: the gateway refuses a create or update that supplies credential_handles and clears them on every read, so there is nothing to author.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/providers_handler.go:150"
+  },
+  "openshell.datamodel.v1.CredentialHandle.metadata": {
+   "bff": "no",
+   "note": "Gateway-internal: the gateway refuses a create or update that supplies credential_handles and clears them on every read, so there is nothing to author.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/providers_handler.go:150"
+  },
+  "openshell.datamodel.v1.ObjectMeta.annotations": {
+   "bff": "yes",
+   "note": "Create forms with an annotations input: sandbox, sandbox from template, sandbox template; without one: provider (the BFF body has no annotations field), workspace (the RPC takes none), member and service endpoint.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:305"
+  },
+  "openshell.datamodel.v1.ObjectMeta.created_time": {
+   "bff": "no",
+   "note": "Gateway-assigned; shown, never sent.",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:322"
+  },
+  "openshell.datamodel.v1.ObjectMeta.deletion_time": {
+   "bff": "no",
+   "note": "Gateway-assigned; the BFF returns it as deletionTimestampMs and no page shows it.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/models/sdk_converters.go:472"
+  },
+  "openshell.datamodel.v1.ObjectMeta.id": {
+   "bff": "no",
+   "note": "Gateway-assigned; shown, never sent.",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:258"
+  },
+  "openshell.datamodel.v1.ObjectMeta.labels": {
+   "bff": "yes",
+   "note": "Create forms with a labels input: sandbox, sandbox from template, sandbox template, workspace; without one: provider (the BFF body accepts labels but the Add Provider form sends none), member and service endpoint; no label can be changed after create.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:278"
+  },
+  "openshell.datamodel.v1.ObjectMeta.name": {
+   "bff": "yes",
+   "note": "Typed on the provider and sandbox template create forms, the two creates that send an ObjectMeta; afterwards taken from the route.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:395"
+  },
+  "openshell.datamodel.v1.ObjectMeta.resource_version": {
+   "bff": "no",
+   "note": "Shown read-only on the provider and workspace pages but never sent back: UpdateProvider reads it as the expected version, and the BFF builds the update with a name only, so a provider edit is not checked against the version the form was opened on.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/providers_handler.go:209"
+  },
+  "openshell.datamodel.v1.ObjectMeta.workspace": {
+   "bff": "no",
+   "note": "Gateway-assigned from the request's workspace_scope; shown, never sent.",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:302"
+  },
+  "openshell.datamodel.v1.Provider.config": {
+   "bff": "yes",
+   "note": "Key/value editor on create and edit; an edit sends only changed entries and an empty value for each removed one.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:622"
+  },
+  "openshell.datamodel.v1.Provider.credential_expiration_times": {
+   "bff": "yes",
+   "note": "Edit form only, future times only; the create body has no such field, so a new provider cannot be given an expiry.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:586"
+  },
+  "openshell.datamodel.v1.Provider.credential_handles": {
+   "bff": "no",
+   "note": "Gateway-internal: the gateway refuses a create or update that supplies credential_handles and clears them on every read, so there is nothing to author.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/providers_handler.go:150"
+  },
+  "openshell.datamodel.v1.Provider.credentials": {
+   "bff": "yes",
+   "note": "Password input per profile credential, sent under its env var name (select at line 550 when several); the edit form never sends an empty value, so a stored credential cannot be removed.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:505"
+  },
+  "openshell.datamodel.v1.Provider.metadata": {
+   "bff": "yes",
+   "note": "Only the name is authored; the BFF body also takes labels, which no form sends, and has no annotations field.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:395"
+  },
+  "openshell.datamodel.v1.Provider.profile_workspace": {
+   "bff": "yes",
+   "note": "No input of its own: derived from the scope of the profile picked in the Type select (the workspace for a workspace profile, empty otherwise), so the CLI default of the workspace for a platform profile cannot be produced.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:298"
+  },
+  "openshell.datamodel.v1.Provider.type": {
+   "bff": "yes",
+   "note": "Select of the profiles the workspace sees; create only (immutable afterwards).",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:412"
+  },
+  "openshell.datamodel.v1.WorkspaceSelector.all_workspaces": {
+   "bff": "yes",
+   "note": "Sent by exactly the four lists that accept it, GET /api/v1/{sandboxes,providers,templates,services}, behind the All workspaces, Sandboxes and Gateway pages; the gateway answers platform admins only.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/allworkspaces_handler.go:57"
+  },
+  "openshell.datamodel.v1.WorkspaceSelector.workspace": {
+   "bff": "yes",
+   "note": "The route's {workspace} segment on every workspace-scoped call.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/server/app.go:200"
+  },
+  "openshell.sandbox.v1.FilesystemPolicy.include_workdir": {
+   "bff": "yes",
+   "note": "Create-time only; the three create presets all send true and the gateway refuses a change on a live sandbox.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1114"
+  },
+  "openshell.sandbox.v1.FilesystemPolicy.read_only": {
+   "bff": "yes",
+   "note": "Create presets all send the same list; on a live sandbox the gateway accepts additions only.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1115"
+  },
+  "openshell.sandbox.v1.FilesystemPolicy.read_write": {
+   "bff": "yes",
+   "note": "Create presets all send the same list; on a live sandbox the gateway accepts additions only.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1116"
+  },
+  "openshell.sandbox.v1.GetSandboxConfigRequest.name": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/settings_handler.go:107"
+  },
+  "openshell.sandbox.v1.GetSandboxConfigRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/settings_handler.go:107"
+  },
+  "openshell.sandbox.v1.GraphqlOperation.fields": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:767"
+  },
+  "openshell.sandbox.v1.GraphqlOperation.operation_name": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:766"
+  },
+  "openshell.sandbox.v1.GraphqlOperation.operation_type": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:765"
+  },
+  "openshell.sandbox.v1.L7Allow.command": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:750"
+  },
+  "openshell.sandbox.v1.L7Allow.fields": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:754"
+  },
+  "openshell.sandbox.v1.L7Allow.method": {
+   "bff": "yes",
+   "note": "Add request rule (allow) on REST and WebSocket endpoints, sent as addAllowRules/addDenyRules; JSON-RPC and MCP methods need the document.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddL7RuleModal.tsx:115"
+  },
+  "openshell.sandbox.v1.L7Allow.operation_name": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:753"
+  },
+  "openshell.sandbox.v1.L7Allow.operation_type": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:752"
+  },
+  "openshell.sandbox.v1.L7Allow.params": {
+   "bff": "yes",
+   "note": "YAML also takes the MCP `tool` shorthand and nested params.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:755"
+  },
+  "openshell.sandbox.v1.L7Allow.path": {
+   "bff": "yes",
+   "note": "Form on REST and WebSocket endpoints only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddL7RuleModal.tsx:133"
+  },
+  "openshell.sandbox.v1.L7Allow.query": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:751"
+  },
+  "openshell.sandbox.v1.L7DenyRule.command": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:750"
+  },
+  "openshell.sandbox.v1.L7DenyRule.fields": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:754"
+  },
+  "openshell.sandbox.v1.L7DenyRule.method": {
+   "bff": "yes",
+   "note": "Add request rule (deny) on REST and WebSocket endpoints, sent as addAllowRules/addDenyRules; JSON-RPC and MCP methods need the document.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddL7RuleModal.tsx:115"
+  },
+  "openshell.sandbox.v1.L7DenyRule.operation_name": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:753"
+  },
+  "openshell.sandbox.v1.L7DenyRule.operation_type": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:752"
+  },
+  "openshell.sandbox.v1.L7DenyRule.params": {
+   "bff": "yes",
+   "note": "YAML also takes the MCP `tool` shorthand and nested params.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:755"
+  },
+  "openshell.sandbox.v1.L7DenyRule.path": {
+   "bff": "yes",
+   "note": "Form on REST and WebSocket endpoints only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddL7RuleModal.tsx:133"
+  },
+  "openshell.sandbox.v1.L7DenyRule.query": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:751"
+  },
+  "openshell.sandbox.v1.L7QueryMatcher.any": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:678"
+  },
+  "openshell.sandbox.v1.L7QueryMatcher.glob": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:674"
+  },
+  "openshell.sandbox.v1.L7Rule.allow": {
+   "bff": "yes",
+   "note": "The form fills method and path only; every other matcher is document only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddL7RuleModal.tsx:86"
+  },
+  "openshell.sandbox.v1.LandlockPolicy.compatibility": {
+   "bff": "yes",
+   "note": "Create-time only; presets all send best_effort and the gateway refuses a change on a live sandbox.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1123"
+  },
+  "openshell.sandbox.v1.McpOptions.allow_all_known_mcp_methods": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:786"
+  },
+  "openshell.sandbox.v1.McpOptions.strict_tool_names": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:785"
+  },
+  "openshell.sandbox.v1.McpOptions.versions": {
+   "bff": "yes",
+   "note": "BROKEN: the YAML reader and writer know three revisions and refuse 2026-07-28, which gateway 0.1.9 accepts; the JSON form passes it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:108"
+  },
+  "openshell.sandbox.v1.MiddlewareEndpointSelector.exclude": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1041"
+  },
+  "openshell.sandbox.v1.MiddlewareEndpointSelector.include": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1040"
+  },
+  "openshell.sandbox.v1.NetworkBinary.path": {
+   "bff": "yes",
+   "note": "Set only while adding an endpoint; a binary cannot be removed from a rule except through the document.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:227"
+  },
+  "openshell.sandbox.v1.NetworkCredentialBinding.provider": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:933"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.access": {
+   "bff": "yes",
+   "note": "Set when the endpoint is added; changing it on an existing endpoint needs the document.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:180"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.advisor_proposed": {
+   "bff": "yes",
+   "note": "Gateway provenance mark carried only by the JSON form; DROPPED when a policy is edited or converted as YAML, which has no field for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1661"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.allow_encoded_slash": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:899"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.allow_uninspected_credentials": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:313"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.allowed_ips": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:254"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.credential_binding": {
+   "bff": "yes",
+   "note": "Sandbox policies only: the gateway refuses it in a global policy.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:932"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.credential_signing": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:911"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.deny_rules": {
+   "bff": "yes",
+   "note": "Add request rule appends method+path deny rules to REST and WebSocket endpoints; anything else is document only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddL7RuleModal.tsx:94"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.enforcement": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:205"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.graphql_max_body_bytes": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:904"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.graphql_persisted_queries": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:901"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.host": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:114"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.json_rpc_max_body_bytes": {
+   "bff": "yes",
+   "note": "YAML spells it json_rpc.max_body_bytes or mcp.max_body_bytes.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:916"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.mcp": {
+   "bff": "yes",
+   "note": "The form offers no MCP protocol at all.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:930"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.path": {
+   "bff": "yes",
+   "note": "No input in the add-endpoint form; the L7 append only reads it back as the target path.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:906"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.persisted_queries": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:900"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.port": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:134"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.ports": {
+   "bff": "yes",
+   "note": "The form always sends [port], one port; several ports need the document.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:99"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.protocol": {
+   "bff": "yes",
+   "note": "Form offers rest, websocket, sql, tcp and none; graphql, json-rpc and mcp are document only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:156"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.provider_credentialed": {
+   "bff": "yes",
+   "note": "Gateway-derived; shown in the JSON view, and a JSON document that sets it is forwarded and then cleared by the gateway.",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "frontend/src/utils/policyFile.ts:1660"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.request_body_credential_rewrite": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:294"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.rules": {
+   "bff": "yes",
+   "note": "Add request rule appends method+path allow rules to REST and WebSocket endpoints; anything else is document only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddL7RuleModal.tsx:86"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.signing_region": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:913"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.signing_service": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:912"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.tls": {
+   "bff": "yes",
+   "note": "Only skip is accepted (NETWORK_TLS_MODE_SKIP in JSON).",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:886"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.token_grant_owner": {
+   "bff": "no",
+   "note": "DROPPED: the SDK endpoint type has no field, so a tokenGrantOwner in a JSON document passes protojson and is discarded; the gateway derives it and ignores a written value anyway.",
+   "sdk": "no",
+   "ui": "none",
+   "where": "backend/pkg/models/policyproto.go:20"
+  },
+  "openshell.sandbox.v1.NetworkEndpoint.websocket_credential_rewrite": {
+   "bff": "yes",
+   "note": "BROKEN: the checkbox is enabled for REST, the default protocol, and gateways 0.1.8+ refuse it there (allowed on websocket only).",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:275"
+  },
+  "openshell.sandbox.v1.NetworkMiddlewareConfig.config": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1031"
+  },
+  "openshell.sandbox.v1.NetworkMiddlewareConfig.endpoints": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1038"
+  },
+  "openshell.sandbox.v1.NetworkMiddlewareConfig.middleware": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1028"
+  },
+  "openshell.sandbox.v1.NetworkMiddlewareConfig.name": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1027"
+  },
+  "openshell.sandbox.v1.NetworkMiddlewareConfig.on_error": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1034"
+  },
+  "openshell.sandbox.v1.NetworkMiddlewareConfig.order": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1047"
+  },
+  "openshell.sandbox.v1.NetworkPolicyRule.binaries": {
+   "bff": "yes",
+   "note": "Set only while adding an endpoint to a rule; removing one needs the document.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:227"
+  },
+  "openshell.sandbox.v1.NetworkPolicyRule.endpoints": {
+   "bff": "yes",
+   "note": "One endpoint per add; existing endpoints can be removed but not edited by form.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:141"
+  },
+  "openshell.sandbox.v1.NetworkPolicyRule.name": {
+   "bff": "yes",
+   "note": "The form sends the rule key (typed or generated) as the name.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:90"
+  },
+  "openshell.sandbox.v1.ProcessPolicy.run_as_group": {
+   "bff": "yes",
+   "note": "Create-time only; presets all send sandbox and the gateway refuses a change on a live sandbox.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1138"
+  },
+  "openshell.sandbox.v1.ProcessPolicy.run_as_user": {
+   "bff": "yes",
+   "note": "Create-time only; presets all send sandbox and the gateway refuses a change on a live sandbox.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1137"
+  },
+  "openshell.sandbox.v1.SandboxPolicy.filesystem": {
+   "bff": "yes",
+   "note": "Read-only card on the Policy tab; set only in the create or global policy document.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1112"
+  },
+  "openshell.sandbox.v1.SandboxPolicy.landlock": {
+   "bff": "yes",
+   "note": "Read-only card on the Policy tab; set only in the create or global policy document.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1122"
+  },
+  "openshell.sandbox.v1.SandboxPolicy.network_middlewares": {
+   "bff": "yes",
+   "note": "Not shown anywhere but the document view.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1150"
+  },
+  "openshell.sandbox.v1.SandboxPolicy.network_policies": {
+   "bff": "yes",
+   "note": "Sandbox scope by form (merge operations) or document; global policy by document only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/index.tsx:377"
+  },
+  "openshell.sandbox.v1.SandboxPolicy.process": {
+   "bff": "yes",
+   "note": "Read-only card on the Policy tab; set only in the create or global policy document.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1135"
+  },
+  "openshell.sandbox.v1.SandboxPolicy.version": {
+   "bff": "yes",
+   "note": "A YAML policy file must say version 1.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/policyFile.ts:1098"
+  },
+  "openshell.sandbox.v1.SettingValue.bool_value": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/SettingValueField.tsx:71"
+  },
+  "openshell.sandbox.v1.SettingValue.bytes_value": {
+   "bff": "no",
+   "note": "The BFF takes a JSON string, boolean or integer only; gateway 0.1.9 refuses bytes for every registered key.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/models/sdk_converters.go:867"
+  },
+  "openshell.sandbox.v1.SettingValue.int_value": {
+   "bff": "yes",
+   "note": "No key registered in gateway 0.1.9 takes an integer, so the gateway refuses every value this type sends.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/SettingValueField.tsx:82"
+  },
+  "openshell.sandbox.v1.SettingValue.string_value": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/SettingValueField.tsx:82"
+  },
+  "openshell.v1.AddAllowRules.rules": {
+   "bff": "yes",
+   "note": "One method+path rule per submit.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:292"
+  },
+  "openshell.v1.AddAllowRules.target": {
+   "bff": "yes",
+   "note": "Built from the endpoint row the rule is added to.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:289"
+  },
+  "openshell.v1.AddDenyRules.deny_rules": {
+   "bff": "yes",
+   "note": "One method+path rule per submit.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:293"
+  },
+  "openshell.v1.AddDenyRules.target": {
+   "bff": "yes",
+   "note": "Built from the endpoint row the rule is added to.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:289"
+  },
+  "openshell.v1.AddNetworkRule.rule": {
+   "bff": "yes",
+   "note": "Always one endpoint, with the fields the add-endpoint form has.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:146"
+  },
+  "openshell.v1.AddNetworkRule.rule_name": {
+   "bff": "yes",
+   "note": "Empty means the CLI-style generated name allow_<host>_<port>.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/AddEndpointModal.tsx:90"
+  },
+  "openshell.v1.AddWorkspaceMemberRequest.principal_subject": {
+   "bff": "yes",
+   "note": "Free text, trimmed.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/AddMemberModal.tsx:90"
+  },
+  "openshell.v1.AddWorkspaceMemberRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/workspaces_handler.go:131"
+  },
+  "openshell.v1.AddWorkspaceMemberRequest.role": {
+   "bff": "yes",
+   "note": "Select offers both settable enum values, USER and ADMIN; ADMIN only to platform admins, which is the gateway's own rule.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/AddMemberModal.tsx:109"
+  },
+  "openshell.v1.AddWorkspaceMemberRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/AddMemberModal.tsx:38"
+  },
+  "openshell.v1.ApproveAllDraftChunksRequest.approvals": {
+   "bff": "yes",
+   "note": "Every pending chunk on screen with its review token; the BFF reads them itself when the browser sends none.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/SandboxDraftsTab/index.tsx:303"
+  },
+  "openshell.v1.ApproveAllDraftChunksRequest.include_security_flagged": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/SandboxDraftsTab/index.tsx:332"
+  },
+  "openshell.v1.ApproveAllDraftChunksRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:421"
+  },
+  "openshell.v1.ApproveAllDraftChunksRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:421"
+  },
+  "openshell.v1.ApproveAllDraftChunksRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:421"
+  },
+  "openshell.v1.ApproveDraftChunkRequest.chunk_id": {
+   "bff": "yes",
+   "note": "The row whose Approve button is pressed.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/SandboxDraftsTab/DraftChunkRow.tsx:157"
+  },
+  "openshell.v1.ApproveDraftChunkRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:318"
+  },
+  "openshell.v1.ApproveDraftChunkRequest.review_token": {
+   "bff": "yes",
+   "note": "Sent from the chunk as last read; the BFF resolves it when absent.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/SandboxDraftsTab/DraftChunkRow.tsx:158"
+  },
+  "openshell.v1.ApproveDraftChunkRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:318"
+  },
+  "openshell.v1.ApproveDraftChunkRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:318"
+  },
+  "openshell.v1.AttachSandboxProviderRequest.expected_resource_version": {
+   "bff": "yes",
+   "note": "Not sent: the BFF accepts expectedResourceVersion and the SDK forwards it, but the UI sends none, so the gateway attaches without a version check (0 = retry on conflict).",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/api/sandboxes.ts:227"
+  },
+  "openshell.v1.AttachSandboxProviderRequest.provider": {
+   "bff": "yes",
+   "note": "Select of the workspace's providers not yet attached.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:83"
+  },
+  "openshell.v1.AttachSandboxProviderRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/logs_handler.go:273"
+  },
+  "openshell.v1.AttachSandboxProviderRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route's {name}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:44"
+  },
+  "openshell.v1.AttachSandboxProviderRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:44"
+  },
+  "openshell.v1.BeginRootfsTarStagingRequest.file_name": {
+   "bff": "no",
+   "note": "No BFF route for BeginRootfsTarStaging.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:216"
+  },
+  "openshell.v1.BeginRootfsTarStagingRequest.size_bytes": {
+   "bff": "no",
+   "note": "No BFF route for BeginRootfsTarStaging.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:216"
+  },
+  "openshell.v1.BeginRootfsTarStagingRequest.workspace_scope": {
+   "bff": "no",
+   "note": "No BFF route for BeginRootfsTarStaging.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:216"
+  },
+  "openshell.v1.ClearDraftChunksRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:499"
+  },
+  "openshell.v1.ClearDraftChunksRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:499"
+  },
+  "openshell.v1.ClearDraftChunksRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:499"
+  },
+  "openshell.v1.ConfigureProviderRefreshRequest.credential_key": {
+   "bff": "yes",
+   "note": "Select of the keys the provider holds plus those its profile declares.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ConfigureRefreshModal.tsx:134"
+  },
+  "openshell.v1.ConfigureProviderRefreshRequest.expiration_time": {
+   "bff": "yes",
+   "note": "datetime-local input with no guard against a past time (the provider edit form has one), and the gateway writes it as the credential's expiry.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ConfigureRefreshModal.tsx:230"
+  },
+  "openshell.v1.ConfigureProviderRefreshRequest.material": {
+   "bff": "yes",
+   "note": "Key/value rows, prefilled from the profile's declared refresh material.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ConfigureRefreshModal.tsx:182"
+  },
+  "openshell.v1.ConfigureProviderRefreshRequest.provider": {
+   "bff": "yes",
+   "note": "From the route's {name}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:85"
+  },
+  "openshell.v1.ConfigureProviderRefreshRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/providers_handler.go:278"
+  },
+  "openshell.v1.ConfigureProviderRefreshRequest.secret_material_keys": {
+   "bff": "yes",
+   "note": "Secret checkbox per material row.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ConfigureRefreshModal.tsx:201"
+  },
+  "openshell.v1.ConfigureProviderRefreshRequest.strategy": {
+   "bff": "yes",
+   "note": "Select offers 4 of the 6 enum values (OAuth2 refresh token, OAuth2 client credentials, Google service account JWT, AWS STS assume role); STATIC and EXTERNAL are left out because the gateway refuses them here as not gateway-mintable, though the BFF map still accepts both.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ConfigureRefreshModal.tsx:147"
+  },
+  "openshell.v1.ConfigureProviderRefreshRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:85"
+  },
+  "openshell.v1.CreateProviderRequest.provider": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:292"
+  },
+  "openshell.v1.CreateProviderRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/providers_handler.go:160"
+  },
+  "openshell.v1.CreateProviderRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:126"
+  },
+  "openshell.v1.CreateSandboxRequest.annotations": {
+   "bff": "yes",
+   "note": "Key/value editor on both create forms.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:368"
+  },
+  "openshell.v1.CreateSandboxRequest.await_main_process_attachment": {
+   "bff": "no",
+   "note": "SDK Create never sets it; it is the CLI's hint that it will attach to the main process, which the dashboard does not do at create.",
+   "sdk": "no",
+   "ui": "none",
+   "where": "backend/pkg/models/builders.go:38"
+  },
+  "openshell.v1.CreateSandboxRequest.labels": {
+   "bff": "yes",
+   "note": "One text input of comma-separated key=value pairs, on both create forms.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:258"
+  },
+  "openshell.v1.CreateSandboxRequest.name": {
+   "bff": "yes",
+   "note": "Optional; empty lets the gateway generate one.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:244"
+  },
+  "openshell.v1.CreateSandboxRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:85"
+  },
+  "openshell.v1.CreateSandboxRequest.service_exposures": {
+   "bff": "yes",
+   "note": "Rows of name and port on both create forms.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxLaunchFields.tsx:87"
+  },
+  "openshell.v1.CreateSandboxRequest.spec": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/hooks/useCreateSandboxForm.ts:163"
+  },
+  "openshell.v1.CreateSandboxRequest.workload_template": {
+   "bff": "yes",
+   "note": "Chosen by the 'Create sandbox' action of a row on the workspace Templates tab; the Create sandbox form itself has no template picker.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/TemplatesTab.tsx:310"
+  },
+  "openshell.v1.CreateSandboxRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:85"
+  },
+  "openshell.v1.CreateSandboxTemplateRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/templates_handler.go:56"
+  },
+  "openshell.v1.CreateSandboxTemplateRequest.template": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:132"
+  },
+  "openshell.v1.CreateSandboxTemplateRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/templates_handler.go:56"
+  },
+  "openshell.v1.CreateSshSessionRequest.sandbox": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:96"
+  },
+  "openshell.v1.CreateSshSessionRequest.workspace_scope": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:96"
+  },
+  "openshell.v1.CreateWorkspaceRequest.labels": {
+   "bff": "yes",
+   "note": "Key/value editor; create only, the gateway has no workspace update.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateWorkspaceModal.tsx:110"
+  },
+  "openshell.v1.CreateWorkspaceRequest.name": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateWorkspaceModal.tsx:87"
+  },
+  "openshell.v1.CreateWorkspaceRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/workspaces_handler.go:72"
+  },
+  "openshell.v1.DeleteProviderProfileRequest.allow_missing": {
+   "bff": "no",
+   "note": "Never sent; deleting a profile that is already gone is an error.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/provider_profiles_handler.go:215"
+  },
+  "openshell.v1.DeleteProviderProfileRequest.id": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/provider/ProfilesPanel.tsx:324"
+  },
+  "openshell.v1.DeleteProviderProfileRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/provider_profiles_handler.go:215"
+  },
+  "openshell.v1.DeleteProviderProfileRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "The workspace of the route, or none for a platform profile.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:43"
+  },
+  "openshell.v1.DeleteProviderRefreshRequest.allow_missing": {
+   "bff": "fixed",
+   "note": "Always false: the BFF passes no DeleteOptions.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/handlers/providers_handler.go:318"
+  },
+  "openshell.v1.DeleteProviderRefreshRequest.credential_key": {
+   "bff": "yes",
+   "note": "The status row whose Delete button is clicked.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:495"
+  },
+  "openshell.v1.DeleteProviderRefreshRequest.provider": {
+   "bff": "yes",
+   "note": "From the route's {name}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:90"
+  },
+  "openshell.v1.DeleteProviderRefreshRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/providers_handler.go:318"
+  },
+  "openshell.v1.DeleteProviderRefreshRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:90"
+  },
+  "openshell.v1.DeleteProviderRequest.allow_missing": {
+   "bff": "fixed",
+   "note": "Always false: the BFF passes no DeleteOptions.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/handlers/providers_handler.go:188"
+  },
+  "openshell.v1.DeleteProviderRequest.name": {
+   "bff": "yes",
+   "note": "The row or selection being deleted.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/pages/ProviderListPage.tsx:396"
+  },
+  "openshell.v1.DeleteProviderRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/providers_handler.go:188"
+  },
+  "openshell.v1.DeleteProviderRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderListPage.tsx:108"
+  },
+  "openshell.v1.DeleteSandboxRequest.allow_missing": {
+   "bff": "no",
+   "note": "Handler passes no DeleteOptions, so it is always false and a sandbox that is already gone answers 404.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:145"
+  },
+  "openshell.v1.DeleteSandboxRequest.name": {
+   "bff": "yes",
+   "note": "The sandbox of the page or row.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:145"
+  },
+  "openshell.v1.DeleteSandboxRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:145"
+  },
+  "openshell.v1.DeleteSandboxRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:145"
+  },
+  "openshell.v1.DeleteSandboxTemplateRequest.allow_missing": {
+   "bff": "no",
+   "note": "Handler passes no DeleteOptions, so it is always false.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/templates_handler.go:77"
+  },
+  "openshell.v1.DeleteSandboxTemplateRequest.name": {
+   "bff": "yes",
+   "note": "The template of the row.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/templates_handler.go:77"
+  },
+  "openshell.v1.DeleteSandboxTemplateRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/templates_handler.go:77"
+  },
+  "openshell.v1.DeleteSandboxTemplateRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/templates_handler.go:77"
+  },
+  "openshell.v1.DeleteServiceRequest.allow_missing": {
+   "bff": "no",
+   "note": "The BFF passes no DeleteOptions, so it is always false.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/services_handler.go:72"
+  },
+  "openshell.v1.DeleteServiceRequest.name": {
+   "bff": "yes",
+   "note": "The name of the row whose Delete action was chosen; empty for the unnamed endpoint.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:182"
+  },
+  "openshell.v1.DeleteServiceRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/services_handler.go:72"
+  },
+  "openshell.v1.DeleteServiceRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:182"
+  },
+  "openshell.v1.DeleteServiceRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:182"
+  },
+  "openshell.v1.DeleteWorkspaceRequest.allow_missing": {
+   "bff": "fixed",
+   "note": "Always false: the BFF passes no DeleteOptions.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/handlers/workspaces_handler.go:90"
+  },
+  "openshell.v1.DeleteWorkspaceRequest.name": {
+   "bff": "yes",
+   "note": "The row or selection being deleted.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/pages/WorkspaceListPage.tsx:136"
+  },
+  "openshell.v1.DeleteWorkspaceRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/workspaces_handler.go:90"
+  },
+  "openshell.v1.DetachSandboxProviderRequest.expected_resource_version": {
+   "bff": "yes",
+   "note": "Not sent: the BFF would read expectedResourceVersion from a body, but detachProvider() calls del() with none.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/api/sandboxes.ts:235"
+  },
+  "openshell.v1.DetachSandboxProviderRequest.provider": {
+   "bff": "yes",
+   "note": "The row whose Detach action is clicked.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:155"
+  },
+  "openshell.v1.DetachSandboxProviderRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/logs_handler.go:297"
+  },
+  "openshell.v1.DetachSandboxProviderRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route's {name}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:45"
+  },
+  "openshell.v1.DetachSandboxProviderRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:45"
+  },
+  "openshell.v1.DraftChunkApproval.chunk_id": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/SandboxDraftsTab/utils.ts:67"
+  },
+  "openshell.v1.DraftChunkApproval.review_token": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/SandboxDraftsTab/utils.ts:72"
+  },
+  "openshell.v1.EditDraftChunkRequest.chunk_id": {
+   "bff": "yes",
+   "note": "The row whose Edit button is pressed (pending chunks only).",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/SandboxDraftsTab/DraftChunkRow.tsx:173"
+  },
+  "openshell.v1.EditDraftChunkRequest.proposed_rule": {
+   "bff": "yes",
+   "note": "JSON text area holding the whole rule as protojson; no YAML and no form.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/components/SandboxDraftsTab/EditDraftModal.tsx:104"
+  },
+  "openshell.v1.EditDraftChunkRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:476"
+  },
+  "openshell.v1.EditDraftChunkRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:476"
+  },
+  "openshell.v1.EditDraftChunkRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:476"
+  },
+  "openshell.v1.ExecSandboxInput.resize": {
+   "bff": "yes",
+   "note": "Sent as a JSON text frame whenever xterm is refitted.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:206"
+  },
+  "openshell.v1.ExecSandboxInput.start": {
+   "bff": "yes",
+   "note": "The Session options form becomes the first WebSocket frame (?start=message).",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:160"
+  },
+  "openshell.v1.ExecSandboxInput.stdin": {
+   "bff": "yes",
+   "note": "Keystrokes typed in the terminal; uploads send file bytes in 256 KiB frames through rawexec.go.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:200"
+  },
+  "openshell.v1.ExecSandboxRequest.cols": {
+   "bff": "yes",
+   "note": "xterm's fitted width as ?cols=; file-transfer commands send 0.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:147"
+  },
+  "openshell.v1.ExecSandboxRequest.command": {
+   "bff": "yes",
+   "note": "Terminal Session options only, one argument per line (default /bin/bash); file-transfer commands are fixed by the BFF.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:267"
+  },
+  "openshell.v1.ExecSandboxRequest.environment": {
+   "bff": "yes",
+   "note": "Terminal Session options only; file-transfer commands always send LC_ALL=C.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:314"
+  },
+  "openshell.v1.ExecSandboxRequest.execution_timeout": {
+   "bff": "no",
+   "note": "The SDK's ExecOptions has no timeout; the BFF bounds file-transfer commands with its own 30 s context deadline and the terminal has none (the CLI has --timeout).",
+   "sdk": "no",
+   "ui": "none",
+   "where": "backend/pkg/handlers/files_handler.go:89"
+  },
+  "openshell.v1.ExecSandboxRequest.no_login_shell": {
+   "bff": "yes",
+   "note": "Terminal Session options only (Skip shell startup files).",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:338"
+  },
+  "openshell.v1.ExecSandboxRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/terminal_handler.go:245"
+  },
+  "openshell.v1.ExecSandboxRequest.rows": {
+   "bff": "yes",
+   "note": "xterm's fitted height as ?rows=; file-transfer commands send 0.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:147"
+  },
+  "openshell.v1.ExecSandboxRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:147"
+  },
+  "openshell.v1.ExecSandboxRequest.stdin": {
+   "bff": "no",
+   "note": "Exec().Run and Stream take no stdin; uploads send it as ExecSandboxInput.stdin frames instead, which also avoids the 1 MiB message limit.",
+   "sdk": "no",
+   "ui": "none",
+   "where": "backend/pkg/clients/rawexec.go:138"
+  },
+  "openshell.v1.ExecSandboxRequest.tty": {
+   "bff": "fixed",
+   "note": "Always true for the terminal (the SDK's Interactive hardcodes it) and false for file transfer, so a user's command cannot run without a PTY (the CLI has --no-tty).",
+   "sdk": "no",
+   "ui": "fixed",
+   "where": "backend/pkg/handlers/terminal_handler.go:245"
+  },
+  "openshell.v1.ExecSandboxRequest.workdir": {
+   "bff": "yes",
+   "note": "Terminal Session options only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:300"
+  },
+  "openshell.v1.ExecSandboxRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:147"
+  },
+  "openshell.v1.ExecSandboxWindowResize.cols": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:206"
+  },
+  "openshell.v1.ExecSandboxWindowResize.rows": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxTerminalTab.tsx:206"
+  },
+  "openshell.v1.ExposeServiceRequest.authorization_mode": {
+   "bff": "fixed",
+   "note": "Always SERVICE_AUTHORIZATION_MODE_STRIP: the BFF passes no ExposeServiceOptions and its body has no field for it, so BEARER_PASSTHROUGH is unreachable and re-exposing an endpoint the CLI set to it resets it to STRIP.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/handlers/services_handler.go:60"
+  },
+  "openshell.v1.ExposeServiceRequest.domain": {
+   "bff": "yes",
+   "note": "The form always sends true; gateway 0.1.9 still stores true whatever is sent (grpc/service.rs).",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:83"
+  },
+  "openshell.v1.ExposeServiceRequest.name": {
+   "bff": "yes",
+   "note": "Optional; empty is the sandbox's unnamed endpoint.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:208"
+  },
+  "openshell.v1.ExposeServiceRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/services_handler.go:60"
+  },
+  "openshell.v1.ExposeServiceRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:83"
+  },
+  "openshell.v1.ExposeServiceRequest.target_port": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:225"
+  },
+  "openshell.v1.ExposeServiceRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:83"
+  },
+  "openshell.v1.GetDraftHistoryRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:512"
+  },
+  "openshell.v1.GetDraftHistoryRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:512"
+  },
+  "openshell.v1.GetDraftPolicyRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:285"
+  },
+  "openshell.v1.GetDraftPolicyRequest.status_filter": {
+   "bff": "yes",
+   "note": "Dropdown: all, pending, approved, rejected.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/SandboxDraftsTab/index.tsx:265"
+  },
+  "openshell.v1.GetDraftPolicyRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:285"
+  },
+  "openshell.v1.GetProviderProfileRequest.id": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:67"
+  },
+  "openshell.v1.GetProviderProfileRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "The workspace of the route, or none for a platform profile.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:43"
+  },
+  "openshell.v1.GetProviderRefreshStatusRequest.credential_key": {
+   "bff": "fixed",
+   "note": "Always empty: the status of every credential of the provider is read.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/handlers/providers_handler.go:241"
+  },
+  "openshell.v1.GetProviderRefreshStatusRequest.provider": {
+   "bff": "yes",
+   "note": "From the route's {name}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:84"
+  },
+  "openshell.v1.GetProviderRefreshStatusRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:84"
+  },
+  "openshell.v1.GetProviderRequest.name": {
+   "bff": "yes",
+   "note": "From the route's {name}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:82"
+  },
+  "openshell.v1.GetProviderRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:82"
+  },
+  "openshell.v1.GetSandboxLogsRequest.lines": {
+   "bff": "yes",
+   "note": "Line count select (100, 200, 500, 2000). Reaches the gateway only in the polling fallback; while the stream is up the control filters the retained lines in the browser.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:391"
+  },
+  "openshell.v1.GetSandboxLogsRequest.min_level": {
+   "bff": "yes",
+   "note": "Minimum level select. Reaches the gateway only in the polling fallback; while the stream is up the control filters the retained lines in the browser.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:364"
+  },
+  "openshell.v1.GetSandboxLogsRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:118"
+  },
+  "openshell.v1.GetSandboxLogsRequest.since_time": {
+   "bff": "yes",
+   "note": "Typed as a duration back from now (30s, 5m, 1h), sent as ?sinceMs=; no absolute time. Reaches the gateway only in the polling fallback; while the stream is up the control filters the retained lines in the browser.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:404"
+  },
+  "openshell.v1.GetSandboxLogsRequest.sources": {
+   "bff": "yes",
+   "note": "Source select, one of gateway or sandbox. Reaches the gateway only in the polling fallback; while the stream is up the control filters the retained lines in the browser.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:379"
+  },
+  "openshell.v1.GetSandboxLogsRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:118"
+  },
+  "openshell.v1.GetSandboxPolicyStatusRequest.global": {
+   "bff": "yes",
+   "note": "True on the /global-policy routes, false on the sandbox routes.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/policies_handler.go:225"
+  },
+  "openshell.v1.GetSandboxPolicyStatusRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route; omitted for the global scope.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/policies_handler.go:65"
+  },
+  "openshell.v1.GetSandboxPolicyStatusRequest.version": {
+   "bff": "yes",
+   "note": "Global: the revision row that is opened; sandbox: the BFF reads every version itself and the per-version route has no UI caller.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/pages/GlobalPolicyPage.tsx:45"
+  },
+  "openshell.v1.GetSandboxPolicyStatusRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route; omitted for the global scope.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/policies_handler.go:65"
+  },
+  "openshell.v1.GetSandboxProviderStatusRequest.provider": {
+   "bff": "no",
+   "note": "RPC has no SDK wrapper, BFF route or UI.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:228"
+  },
+  "openshell.v1.GetSandboxProviderStatusRequest.receipt_id": {
+   "bff": "no",
+   "note": "RPC has no SDK wrapper, BFF route or UI. The receipts it would name come back on attach, detach and update, where the SDK drops them.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:228"
+  },
+  "openshell.v1.GetSandboxProviderStatusRequest.sandbox": {
+   "bff": "no",
+   "note": "RPC has no SDK wrapper, BFF route or UI.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:228"
+  },
+  "openshell.v1.GetSandboxProviderStatusRequest.workspace_scope": {
+   "bff": "no",
+   "note": "RPC has no SDK wrapper, BFF route or UI.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:228"
+  },
+  "openshell.v1.GetSandboxRequest.name": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:113"
+  },
+  "openshell.v1.GetSandboxRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:113"
+  },
+  "openshell.v1.GetSandboxTemplateRequest.name": {
+   "bff": "yes",
+   "note": "The BFF forwards it but no UI calls the route.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/templates_handler.go:66"
+  },
+  "openshell.v1.GetSandboxTemplateRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "The BFF forwards it but no UI calls the route.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/templates_handler.go:66"
+  },
+  "openshell.v1.GetServiceRequest.name": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:247"
+  },
+  "openshell.v1.GetServiceRequest.sandbox": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:247"
+  },
+  "openshell.v1.GetServiceRequest.workspace_scope": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:247"
+  },
+  "openshell.v1.GetServiceRouteSnapshotRequest.workspace_scope": {
+   "bff": "no",
+   "note": "",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:247"
+  },
+  "openshell.v1.GetWorkspaceRequest.name": {
+   "bff": "yes",
+   "note": "From the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/WorkspaceDetailPage.tsx:67"
+  },
+  "openshell.v1.GpuResourceRequirements.count": {
+   "bff": "yes",
+   "note": "A count of 1 or more only: gpuCount 0 is not sent (sdk_converters.go:234) and the template form sends gpu only when the count is above 0 (CreateTemplateModal.tsx:118), so a GPU with no count (driver default) cannot be requested.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:286"
+  },
+  "openshell.v1.ImportProviderProfilesRequest.profiles": {
+   "bff": "yes",
+   "note": "One profile from the form; several from files.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:115"
+  },
+  "openshell.v1.ImportProviderProfilesRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:80"
+  },
+  "openshell.v1.ImportProviderProfilesRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "The workspace of the route, or none for a platform profile.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:43"
+  },
+  "openshell.v1.L7RuleTarget.any_binary": {
+   "bff": "yes",
+   "note": "Declared by the app from the endpoint and rule the request rule is added to.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:273"
+  },
+  "openshell.v1.L7RuleTarget.binaries": {
+   "bff": "yes",
+   "note": "Declared by the app from the endpoint and rule the request rule is added to.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:271"
+  },
+  "openshell.v1.L7RuleTarget.host": {
+   "bff": "yes",
+   "note": "Declared by the app from the endpoint and rule the request rule is added to.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:264"
+  },
+  "openshell.v1.L7RuleTarget.path": {
+   "bff": "yes",
+   "note": "Always sent, empty for an endpoint without a path scope.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:268"
+  },
+  "openshell.v1.L7RuleTarget.ports": {
+   "bff": "yes",
+   "note": "Declared by the app from the endpoint and rule the request rule is added to.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:265"
+  },
+  "openshell.v1.L7RuleTarget.rule_name": {
+   "bff": "yes",
+   "note": "Declared by the app from the endpoint and rule the request rule is added to.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:263"
+  },
+  "openshell.v1.LintProviderProfilesRequest.profiles": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/components/provider/ProfileFileModal.tsx:105"
+  },
+  "openshell.v1.LintProviderProfilesRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "The workspace of the route, or none for a platform profile.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:43"
+  },
+  "openshell.v1.ListProviderProfilesRequest.page_size": {
+   "bff": "fixed",
+   "note": "The BFF reads every page and returns one list.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:43"
+  },
+  "openshell.v1.ListProviderProfilesRequest.page_token": {
+   "bff": "fixed",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:49"
+  },
+  "openshell.v1.ListProviderProfilesRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "The workspace of the route, or none for a platform profile.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:43"
+  },
+  "openshell.v1.ListProvidersRequest.label_selector": {
+   "bff": "no",
+   "note": "The gateway filters providers by label (CLI: provider list --label-selector) but the SDK's Providers().List never sets it, and comments in the BFF (line 99) and frontend/src/api/allWorkspaces.ts:42 say the gateway offers no filter.",
+   "sdk": "no",
+   "ui": "none",
+   "where": "backend/pkg/handlers/allworkspaces_handler.go:102"
+  },
+  "openshell.v1.ListProvidersRequest.page_size": {
+   "bff": "fixed",
+   "note": "Always unset (gateway default): the BFF reads every page with ListAll and the table pages in the browser.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/providers_handler.go:100"
+  },
+  "openshell.v1.ListProvidersRequest.page_token": {
+   "bff": "no",
+   "note": "Filled in by the SDK pager inside ListAll; the browser never pages.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/providers_handler.go:100"
+  },
+  "openshell.v1.ListProvidersRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route; all_workspaces on GET /api/v1/providers (All workspaces and Gateway pages).",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderListPage.tsx:82"
+  },
+  "openshell.v1.ListSandboxPoliciesRequest.global": {
+   "bff": "fixed",
+   "note": "Always true: the BFF lists only global revisions with this RPC.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/handlers/policies_handler.go:241"
+  },
+  "openshell.v1.ListSandboxPoliciesRequest.page_size": {
+   "bff": "no",
+   "note": "ListAll runs with the gateway's default page size.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/policies_handler.go:241"
+  },
+  "openshell.v1.ListSandboxPoliciesRequest.page_token": {
+   "bff": "no",
+   "note": "Followed inside the SDK pager by ListAll; never reaches the browser.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/policies_handler.go:241"
+  },
+  "openshell.v1.ListSandboxPoliciesRequest.sandbox": {
+   "bff": "no",
+   "note": "Never sent: sandbox history comes from GetSandboxPolicyStatus per version.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/policies_handler.go:241"
+  },
+  "openshell.v1.ListSandboxPoliciesRequest.workspace_scope": {
+   "bff": "no",
+   "note": "Never sent: only the global listing is called.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/policies_handler.go:241"
+  },
+  "openshell.v1.ListSandboxProvidersRequest.page_size": {
+   "bff": "fixed",
+   "note": "Always unset (gateway default): the BFF reads every page with ListAllProviders.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/logs_handler.go:240"
+  },
+  "openshell.v1.ListSandboxProvidersRequest.page_token": {
+   "bff": "no",
+   "note": "Filled in by the SDK pager inside ListAllProviders.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/logs_handler.go:240"
+  },
+  "openshell.v1.ListSandboxProvidersRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route's {name}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:42"
+  },
+  "openshell.v1.ListSandboxProvidersRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxProvidersTab.tsx:42"
+  },
+  "openshell.v1.ListSandboxTemplatesRequest.label_selector": {
+   "bff": "yes",
+   "note": "Only the all-workspaces Templates table (platform admin) has a selector input; the workspace Templates tab lists without one (TemplatesTab.tsx:89) although its route accepts labelSelector.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/pages/AllWorkspacesPage.tsx:225"
+  },
+  "openshell.v1.ListSandboxTemplatesRequest.page_size": {
+   "bff": "no",
+   "note": "ListAll sends 0 (gateway default page size) and reads every page; the template tables have no server paging.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/templates_handler.go:30"
+  },
+  "openshell.v1.ListSandboxTemplatesRequest.page_token": {
+   "bff": "no",
+   "note": "Filled by the SDK's ListAll pager, never by the browser.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/templates_handler.go:30"
+  },
+  "openshell.v1.ListSandboxTemplatesRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route, or all workspaces on GET /api/v1/templates.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/templates_handler.go:30"
+  },
+  "openshell.v1.ListSandboxesRequest.label_selector": {
+   "bff": "yes",
+   "note": "Free-text selector plus a second 'type label' input, combined into one selector.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/pages/SandboxListPage.tsx:334"
+  },
+  "openshell.v1.ListSandboxesRequest.page_size": {
+   "bff": "yes",
+   "note": "Per-page select of the cursor pagination; the BFF accepts 1 to 100.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/pages/SandboxListPage.tsx:169"
+  },
+  "openshell.v1.ListSandboxesRequest.page_token": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/SandboxListPage.tsx:170"
+  },
+  "openshell.v1.ListSandboxesRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route, or all workspaces on GET /api/v1/sandboxes.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:29"
+  },
+  "openshell.v1.ListServicesRequest.page_size": {
+   "bff": "no",
+   "note": "The BFF calls ListAll with no page size (0, the gateway's default) and returns every page as one array.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/services_handler.go:39"
+  },
+  "openshell.v1.ListServicesRequest.page_token": {
+   "bff": "no",
+   "note": "Filled by the SDK pager inside ListAll; the browser never pages.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/services_handler.go:39"
+  },
+  "openshell.v1.ListServicesRequest.sandbox": {
+   "bff": "yes",
+   "note": "The sandbox of the route on the Services tab; empty on the workspace and all-workspaces lists.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:59"
+  },
+  "openshell.v1.ListServicesRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "The route's workspace, or all workspaces on GET /api/v1/services.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxServicesTab.tsx:59"
+  },
+  "openshell.v1.ListWorkspaceMembersRequest.page_size": {
+   "bff": "fixed",
+   "note": "Always unset (gateway default): the BFF reads every page with ListAllMembers.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/workspaces_handler.go:105"
+  },
+  "openshell.v1.ListWorkspaceMembersRequest.page_token": {
+   "bff": "no",
+   "note": "Filled in by the SDK pager inside ListAllMembers.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/workspaces_handler.go:105"
+  },
+  "openshell.v1.ListWorkspaceMembersRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/MemberListPage.tsx:48"
+  },
+  "openshell.v1.ListWorkspacesRequest.label_selector": {
+   "bff": "yes",
+   "note": "Search box taking the gateway's own key=value,key=value form.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/pages/WorkspaceListPage.tsx:312"
+  },
+  "openshell.v1.ListWorkspacesRequest.page_size": {
+   "bff": "yes",
+   "note": "The table's per-page choice, 1 to 100; lists without pageSize (navigation count) read every page.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/WorkspaceListPage.tsx:109"
+  },
+  "openshell.v1.ListWorkspacesRequest.page_token": {
+   "bff": "yes",
+   "note": "The gateway's nextPageToken, passed back by the cursor pagination.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/WorkspaceListPage.tsx:110"
+  },
+  "openshell.v1.PolicyMergeOperation.add_allow_rules": {
+   "bff": "yes",
+   "note": "REST and WebSocket endpoints only, method+path.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/index.tsx:141"
+  },
+  "openshell.v1.PolicyMergeOperation.add_deny_rules": {
+   "bff": "yes",
+   "note": "REST and WebSocket endpoints with an allow base only, method+path.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/index.tsx:141"
+  },
+  "openshell.v1.PolicyMergeOperation.add_rule": {
+   "bff": "yes",
+   "note": "Add endpoint: one endpoint, optionally with binaries, into a new or named rule.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/index.tsx:129"
+  },
+  "openshell.v1.PolicyMergeOperation.remove_binary": {
+   "bff": "yes",
+   "note": "The BFF and SDK carry it but no UI issues it; removing a binary means replacing the policy document.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/models/policyproto.go:596"
+  },
+  "openshell.v1.PolicyMergeOperation.remove_endpoint": {
+   "bff": "yes",
+   "note": "One operation per port after a confirmation that lists every endpoint the host:port removal touches.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/PolicyRuleEditor/index.tsx:386"
+  },
+  "openshell.v1.PolicyMergeOperation.remove_rule": {
+   "bff": "yes",
+   "note": "Trash button on the rule row, sent without confirmation.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/PolicyRuleEditor/index.tsx:382"
+  },
+  "openshell.v1.ProviderCredentialRefresh.additional_outputs": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:705"
+  },
+  "openshell.v1.ProviderCredentialRefresh.material": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:688"
+  },
+  "openshell.v1.ProviderCredentialRefresh.max_lifetime": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:720"
+  },
+  "openshell.v1.ProviderCredentialRefresh.refresh_before": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:719"
+  },
+  "openshell.v1.ProviderCredentialRefresh.scopes": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:686"
+  },
+  "openshell.v1.ProviderCredentialRefresh.strategy": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:677"
+  },
+  "openshell.v1.ProviderCredentialRefresh.token_url": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:685"
+  },
+  "openshell.v1.ProviderCredentialRefreshMaterial.description": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:691"
+  },
+  "openshell.v1.ProviderCredentialRefreshMaterial.name": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:688"
+  },
+  "openshell.v1.ProviderCredentialRefreshMaterial.required": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:694"
+  },
+  "openshell.v1.ProviderCredentialRefreshMaterial.secret": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:695"
+  },
+  "openshell.v1.ProviderCredentialRefreshOutput.credential": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:710"
+  },
+  "openshell.v1.ProviderCredentialRefreshOutput.output": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:709"
+  },
+  "openshell.v1.ProviderCredentialTokenGrant.audience": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:744"
+  },
+  "openshell.v1.ProviderCredentialTokenGrant.audience_overrides": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:750"
+  },
+  "openshell.v1.ProviderCredentialTokenGrant.cache_ttl": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:768"
+  },
+  "openshell.v1.ProviderCredentialTokenGrant.client_assertion_type": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:746"
+  },
+  "openshell.v1.ProviderCredentialTokenGrant.grant_type": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:735"
+  },
+  "openshell.v1.ProviderCredentialTokenGrant.jwt_svid_audience": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:745"
+  },
+  "openshell.v1.ProviderCredentialTokenGrant.requested_token_type": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:748"
+  },
+  "openshell.v1.ProviderCredentialTokenGrant.scopes": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:747"
+  },
+  "openshell.v1.ProviderCredentialTokenGrant.subject_token": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:772"
+  },
+  "openshell.v1.ProviderCredentialTokenGrant.token_endpoint": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:742"
+  },
+  "openshell.v1.ProviderCredentialTokenGrantAudienceOverride.audience": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:754"
+  },
+  "openshell.v1.ProviderCredentialTokenGrantAudienceOverride.host": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:756"
+  },
+  "openshell.v1.ProviderCredentialTokenGrantAudienceOverride.path": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:758"
+  },
+  "openshell.v1.ProviderCredentialTokenGrantAudienceOverride.port": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:757"
+  },
+  "openshell.v1.ProviderCredentialTokenGrantAudienceOverride.scopes": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:759"
+  },
+  "openshell.v1.ProviderCredentialTokenGrantSubjectToken.credential": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:775"
+  },
+  "openshell.v1.ProviderCredentialTokenGrantSubjectToken.source": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:774"
+  },
+  "openshell.v1.ProviderCredentialTokenGrantSubjectToken.subject_token_type": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:777"
+  },
+  "openshell.v1.ProviderProfile.annotations": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:889"
+  },
+  "openshell.v1.ProviderProfile.binaries": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it. A profile without binaries contributes a network rule no program is named in.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:847"
+  },
+  "openshell.v1.ProviderProfile.category": {
+   "bff": "yes",
+   "note": "All seven categories of the enum are offered.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:182"
+  },
+  "openshell.v1.ProviderProfile.credentials": {
+   "bff": "yes",
+   "note": "The form sets a credential's name, env vars and required flag only; see ProviderProfileCredential.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:209"
+  },
+  "openshell.v1.ProviderProfile.description": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:173"
+  },
+  "openshell.v1.ProviderProfile.discovery": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:913"
+  },
+  "openshell.v1.ProviderProfile.display_name": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:160"
+  },
+  "openshell.v1.ProviderProfile.endpoints": {
+   "bff": "yes",
+   "note": "BROKEN: the form sets host and port only. Protocol, access, rules, TLS, enforcement and allow_uninspected_credentials are file-only, and without one of them the gateway refuses any profile that also declares a credential. The SDK type drops all but host, port and protocol.",
+   "sdk": "no",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:299"
+  },
+  "openshell.v1.ProviderProfile.files": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it. Experimental upstream.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:828"
+  },
+  "openshell.v1.ProviderProfile.id": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:142"
+  },
+  "openshell.v1.ProviderProfile.inference_capable": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:200"
+  },
+  "openshell.v1.ProviderProfile.resource_version": {
+   "bff": "yes",
+   "note": "Written by the export and read back for the update's concurrency check.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/utils/profileFile.ts:884"
+  },
+  "openshell.v1.ProviderProfile.scope": {
+   "bff": "yes",
+   "note": "Set by the gateway; ignored when written.",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "frontend/src/components/provider/ProfilesPanel.tsx:303"
+  },
+  "openshell.v1.ProviderProfile.source": {
+   "bff": "yes",
+   "note": "Set by the gateway; ignored when written.",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "frontend/src/components/provider/ProfilesPanel.tsx:303"
+  },
+  "openshell.v1.ProviderProfileCredential.auth_style": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it. Without it the proxy puts the secret in the Authorization header only, so a service that reads x-api-key, a query parameter or a path segment never gets it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:803"
+  },
+  "openshell.v1.ProviderProfileCredential.description": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:800"
+  },
+  "openshell.v1.ProviderProfileCredential.env_vars": {
+   "bff": "yes",
+   "note": "Comma-separated in one input.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:233"
+  },
+  "openshell.v1.ProviderProfileCredential.header_name": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it. Required by the gateway for auth_style bearer and header.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:804"
+  },
+  "openshell.v1.ProviderProfileCredential.name": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:217"
+  },
+  "openshell.v1.ProviderProfileCredential.path_template": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it. Required for auth_style path.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:806"
+  },
+  "openshell.v1.ProviderProfileCredential.query_param": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it. Required for auth_style query.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:805"
+  },
+  "openshell.v1.ProviderProfileCredential.refresh": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it. A provider's refresh can be configured afterwards on the provider page, for the strategies the profile declares.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:673"
+  },
+  "openshell.v1.ProviderProfileCredential.required": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:249"
+  },
+  "openshell.v1.ProviderProfileCredential.stable_placeholder": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:802"
+  },
+  "openshell.v1.ProviderProfileCredential.token_grant": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:731"
+  },
+  "openshell.v1.ProviderProfileCredential.token_grant_owners": {
+   "bff": "yes",
+   "note": "Output only; the gateway derives it.",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "backend/pkg/models/provider_profile.go:403"
+  },
+  "openshell.v1.ProviderProfileDiscovery.credentials": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:913"
+  },
+  "openshell.v1.ProviderProfileFile.content": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:836"
+  },
+  "openshell.v1.ProviderProfileFile.env_var": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:838"
+  },
+  "openshell.v1.ProviderProfileFile.path": {
+   "bff": "yes",
+   "note": "File import only (YAML or JSON chosen from disk); the Create profile form has no input for it.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/utils/profileFile.ts:835"
+  },
+  "openshell.v1.ProviderProfileImportItem.profile": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateProfileModal.tsx:105"
+  },
+  "openshell.v1.ProviderProfileImportItem.source": {
+   "bff": "yes",
+   "note": "The label the gateway repeats in its diagnostics (the CLI sends the file path). The BFF takes importSource; the UI never sends it, so diagnostics for several files cannot name the file.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/models/provider_profile.go:335"
+  },
+  "openshell.v1.RejectDraftChunkRequest.chunk_id": {
+   "bff": "yes",
+   "note": "The row whose Reject is confirmed.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/SandboxDraftsTab/DraftChunkRow.tsx:243"
+  },
+  "openshell.v1.RejectDraftChunkRequest.reason": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/SandboxDraftsTab/DraftChunkRow.tsx:229"
+  },
+  "openshell.v1.RejectDraftChunkRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:351"
+  },
+  "openshell.v1.RejectDraftChunkRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:351"
+  },
+  "openshell.v1.RejectDraftChunkRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:351"
+  },
+  "openshell.v1.RemoveNetworkBinary.binary_path": {
+   "bff": "yes",
+   "note": "No UI issues removeBinary.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/models/policyproto.go:599"
+  },
+  "openshell.v1.RemoveNetworkBinary.rule_name": {
+   "bff": "yes",
+   "note": "No UI issues removeBinary.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/models/policyproto.go:598"
+  },
+  "openshell.v1.RemoveNetworkEndpoint.host": {
+   "bff": "yes",
+   "note": "From the endpoint row that is removed.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:173"
+  },
+  "openshell.v1.RemoveNetworkEndpoint.port": {
+   "bff": "yes",
+   "note": "One operation per port of the endpoint; an endpoint with no port cannot be removed by form.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:173"
+  },
+  "openshell.v1.RemoveNetworkEndpoint.rule_name": {
+   "bff": "yes",
+   "note": "From the endpoint row that is removed.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:173"
+  },
+  "openshell.v1.RemoveNetworkRule.rule_name": {
+   "bff": "yes",
+   "note": "From the rule row.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/PolicyRuleEditor/utils.ts:153"
+  },
+  "openshell.v1.RemoveWorkspaceMemberRequest.allow_missing": {
+   "bff": "fixed",
+   "note": "Always false: the BFF passes no DeleteOptions.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/handlers/workspaces_handler.go:146"
+  },
+  "openshell.v1.RemoveWorkspaceMemberRequest.principal_subject": {
+   "bff": "yes",
+   "note": "The row whose Remove action is clicked.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/pages/MemberListPage.tsx:163"
+  },
+  "openshell.v1.RemoveWorkspaceMemberRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/workspaces_handler.go:146"
+  },
+  "openshell.v1.RemoveWorkspaceMemberRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/MemberListPage.tsx:49"
+  },
+  "openshell.v1.ResourceRequirements.gpu": {
+   "bff": "yes",
+   "note": "Set through the GPU count input of the Create sandbox form; present only when a count is given.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:286"
+  },
+  "openshell.v1.ResumeSandboxRequest.name": {
+   "bff": "no",
+   "note": "No BFF route for suspend or resume.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:221"
+  },
+  "openshell.v1.ResumeSandboxRequest.restart_if_restore_fails": {
+   "bff": "no",
+   "note": "No BFF route for suspend or resume.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:221"
+  },
+  "openshell.v1.ResumeSandboxRequest.workspace_scope": {
+   "bff": "no",
+   "note": "No BFF route for suspend or resume.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:221"
+  },
+  "openshell.v1.RevokeSshSessionRequest.allow_missing": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:96"
+  },
+  "openshell.v1.RevokeSshSessionRequest.token": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:96"
+  },
+  "openshell.v1.RotateProviderCredentialRequest.credential_key": {
+   "bff": "yes",
+   "note": "The status row whose Rotate now button is clicked.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:350"
+  },
+  "openshell.v1.RotateProviderCredentialRequest.provider": {
+   "bff": "yes",
+   "note": "From the route's {name}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:89"
+  },
+  "openshell.v1.RotateProviderCredentialRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/providers_handler.go:299"
+  },
+  "openshell.v1.RotateProviderCredentialRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/pages/ProviderDetailPage.tsx:89"
+  },
+  "openshell.v1.SandboxCommandUpdate.argv": {
+   "bff": "no",
+   "note": "No BFF route for UpdateSandbox and no SDK wrapper.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.SandboxMapUpdate.values": {
+   "bff": "no",
+   "note": "No BFF route for UpdateSandbox and no SDK wrapper.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.SandboxResources.cpu": {
+   "bff": "yes",
+   "note": "Template form only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:249"
+  },
+  "openshell.v1.SandboxResources.gpu": {
+   "bff": "yes",
+   "note": "Sent only with a count above 0 (CreateTemplateModal.tsx:118); gpu without a count (driver default), which the BFF body can carry, has no input.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:238"
+  },
+  "openshell.v1.SandboxResources.memory": {
+   "bff": "yes",
+   "note": "Template form only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:259"
+  },
+  "openshell.v1.SandboxServiceExposure.authorization_mode": {
+   "bff": "fixed",
+   "note": "Always STRIP: the BFF's ServiceExposure has no mode field (builders.go:9) and the SDK sends STRIP for an unset mode, so BEARER_PASSTHROUGH (CLI --expose-authorization-mode) cannot be chosen at create.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/models/sdk_converters.go:255"
+  },
+  "openshell.v1.SandboxServiceExposure.service": {
+   "bff": "yes",
+   "note": "Optional; empty is the sandbox's unnamed service.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/ServiceExposureEditor.tsx:44"
+  },
+  "openshell.v1.SandboxServiceExposure.target_port": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/ServiceExposureEditor.tsx:56"
+  },
+  "openshell.v1.SandboxServiceLevel.startup": {
+   "bff": "yes",
+   "note": "Template form, Advanced options.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:329"
+  },
+  "openshell.v1.SandboxSpec.command": {
+   "bff": "yes",
+   "note": "Text area, one argument per line, on both create forms.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxLaunchFields.tsx:37"
+  },
+  "openshell.v1.SandboxSpec.environment": {
+   "bff": "yes",
+   "note": "Key/value editor on the Create sandbox form only; the SDK refuses it beside a workload template.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:342"
+  },
+  "openshell.v1.SandboxSpec.log_level": {
+   "bff": "yes",
+   "note": "Select of trace/debug/info/warn/error or gateway default; Create sandbox form only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:393"
+  },
+  "openshell.v1.SandboxSpec.policy": {
+   "bff": "yes",
+   "note": "Required by the BFF (sandboxes_handler.go:69): a preset select fills a YAML/JSON editor with file upload, and the result is posted as protojson in `policy` and parsed by ParseSDKPolicy into spec.policy; there is no structured rule editor at create.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:145"
+  },
+  "openshell.v1.SandboxSpec.provider_attachment_epoch": {
+   "bff": "no",
+   "note": "Not a gap: gateway-owned, the gateway overwrites whatever a caller sends at create (upstream grpc/sandbox.rs:607 at v0.1.9).",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/models/sdk_converters.go:207"
+  },
+  "openshell.v1.SandboxSpec.providers": {
+   "bff": "yes",
+   "note": "A checkbox per provider of the workspace, on both create forms.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:212"
+  },
+  "openshell.v1.SandboxSpec.resource_requirements": {
+   "bff": "yes",
+   "note": "Only gpu.count, through the BFF's gpuCount; Create sandbox form only.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:286"
+  },
+  "openshell.v1.SandboxSpec.restart_policy": {
+   "bff": "fixed",
+   "note": "Always NEVER: the BFF never sets SandboxSpec.RestartPolicy and the SDK converter sends NEVER for the empty value, so on-failure and always (CLI --restart-policy) cannot be chosen, and the BFF's Sandbox DTO does not return the value either.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/models/sdk_converters.go:207"
+  },
+  "openshell.v1.SandboxSpec.template": {
+   "bff": "yes",
+   "note": "Built by the BFF from image, runtimeClassName, driverConfig, cpu and memory (sdk_converters.go:210) and always sent, even when all are empty.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:184"
+  },
+  "openshell.v1.SandboxSpec.tty": {
+   "bff": "yes",
+   "note": "Checkbox, enabled and sent only beside a command.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/sandbox/SandboxLaunchFields.tsx:67"
+  },
+  "openshell.v1.SandboxStartup.max_burst": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:346"
+  },
+  "openshell.v1.SandboxStartup.ready_within": {
+   "bff": "yes",
+   "note": "Whole seconds, minutes or hours (30s, 5m, 1h), sent as readyWithinMs.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:335"
+  },
+  "openshell.v1.SandboxTemplate.agent_socket": {
+   "bff": "no",
+   "note": "No field on the BFF's create body, and FromSDKSandbox leaves it out of the response (sdk_converters.go:127).",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/models/builders.go:38"
+  },
+  "openshell.v1.SandboxTemplate.annotations": {
+   "bff": "no",
+   "note": "Shown on the sandbox page when set; the create body has no field for it (the form's Annotations are the sandbox's own metadata).",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "frontend/src/components/sandbox/SandboxSpecDetails.tsx:117"
+  },
+  "openshell.v1.SandboxTemplate.driver_config": {
+   "bff": "yes",
+   "note": "A JSON object typed into a text area.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:424"
+  },
+  "openshell.v1.SandboxTemplate.environment": {
+   "bff": "no",
+   "note": "Shown on the sandbox page when set; the form's environment goes to SandboxSpec.environment.",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "frontend/src/components/sandbox/SandboxSpecDetails.tsx:107"
+  },
+  "openshell.v1.SandboxTemplate.image": {
+   "bff": "yes",
+   "note": "A bare name is rewritten to the community registry reference before it is sent (useCreateSandboxForm.ts:14).",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:184"
+  },
+  "openshell.v1.SandboxTemplate.labels": {
+   "bff": "no",
+   "note": "Shown on the sandbox page when set; the create body has no field for it.",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "frontend/src/components/sandbox/SandboxSpecDetails.tsx:112"
+  },
+  "openshell.v1.SandboxTemplate.resources": {
+   "bff": "yes",
+   "note": "Only limits.cpu and limits.memory (sdk_converters.go:221); requests.cpu and requests.memory, which the gateway also reads, can be shown but not set.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:296"
+  },
+  "openshell.v1.SandboxTemplate.runtime_class_name": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateSandboxModal.tsx:406"
+  },
+  "openshell.v1.SandboxTemplate.user_namespaces": {
+   "bff": "no",
+   "note": "Shown on the sandbox page when set; the create body has no field for it.",
+   "sdk": "yes",
+   "ui": "read-only",
+   "where": "frontend/src/components/sandbox/SandboxSpecDetails.tsx:102"
+  },
+  "openshell.v1.SandboxWorkloadConfig.environment": {
+   "bff": "yes",
+   "note": "BROKEN: one text input split on commas by parseLabels (useCreateSandboxForm.ts:28), so a value that contains a comma (NO_PROXY=a,b) or is empty is refused by the form and cannot be put in a template.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:212"
+  },
+  "openshell.v1.SandboxWorkloadConfig.image": {
+   "bff": "yes",
+   "note": "Optional; a bare name is rewritten to the community registry reference.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:194"
+  },
+  "openshell.v1.SandboxWorkloadConfig.resources": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:230"
+  },
+  "openshell.v1.SandboxWorkloadTemplate.metadata": {
+   "bff": "yes",
+   "note": "Name, labels (comma-separated text) and annotations (key/value editor); the BFF sets nothing else of ObjectMeta.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:177"
+  },
+  "openshell.v1.SandboxWorkloadTemplate.spec": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:137"
+  },
+  "openshell.v1.SandboxWorkloadTemplateSpec.desired_service_level": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:329"
+  },
+  "openshell.v1.SandboxWorkloadTemplateSpec.driver_config": {
+   "bff": "yes",
+   "note": "A JSON object typed into a text area.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:387"
+  },
+  "openshell.v1.SandboxWorkloadTemplateSpec.workload": {
+   "bff": "yes",
+   "note": "Always sent, even empty, because the gateway refuses a template without a workload.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/CreateTemplateModal.tsx:141"
+  },
+  "openshell.v1.StartSandboxRequest.name": {
+   "bff": "yes",
+   "note": "The sandbox of the page or row.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:136"
+  },
+  "openshell.v1.StartSandboxRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:136"
+  },
+  "openshell.v1.StartSandboxRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:136"
+  },
+  "openshell.v1.StopSandboxRequest.name": {
+   "bff": "yes",
+   "note": "The sandbox of the page or row.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:125"
+  },
+  "openshell.v1.StopSandboxRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:125"
+  },
+  "openshell.v1.StopSandboxRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/sandboxes_handler.go:125"
+  },
+  "openshell.v1.SuspendSandboxRequest.name": {
+   "bff": "no",
+   "note": "No BFF route for suspend or resume.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:220"
+  },
+  "openshell.v1.SuspendSandboxRequest.workspace_scope": {
+   "bff": "no",
+   "note": "No BFF route for suspend or resume.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:220"
+  },
+  "openshell.v1.TcpForwardFrame.data": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "openshell.v1.TcpForwardFrame.init": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "openshell.v1.TcpForwardInit.authorization_token": {
+   "bff": "no",
+   "note": "Set only by the SDK's SSH().Tunnel, to the session token it has just created.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "openshell.v1.TcpForwardInit.sandbox": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "openshell.v1.TcpForwardInit.service_id": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "openshell.v1.TcpForwardInit.ssh": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "openshell.v1.TcpForwardInit.tcp": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "openshell.v1.TcpForwardInit.workspace": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "openshell.v1.TcpRelayTarget.host": {
+   "bff": "no",
+   "note": "The SDK's TCP().Forward hardcodes 127.0.0.1.",
+   "sdk": "no",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "openshell.v1.TcpRelayTarget.port": {
+   "bff": "no",
+   "note": "The Connect card's Port input only fills in a CLI command to copy.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "frontend/src/components/ConnectCard.tsx:152"
+  },
+  "openshell.v1.UndoDraftChunkRequest.chunk_id": {
+   "bff": "yes",
+   "note": "The approved row whose Undo is pressed.",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/components/SandboxDraftsTab/DraftChunkRow.tsx:185"
+  },
+  "openshell.v1.UndoDraftChunkRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:486"
+  },
+  "openshell.v1.UndoDraftChunkRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:486"
+  },
+  "openshell.v1.UndoDraftChunkRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/drafts_handler.go:486"
+  },
+  "openshell.v1.UpdateConfigRequest.annotations": {
+   "bff": "no",
+   "note": "The SDK carries it but no BFF body has it, so dashboard policy revisions carry no caller provenance.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/policies_handler.go:124"
+  },
+  "openshell.v1.UpdateConfigRequest.delete_setting": {
+   "bff": "yes",
+   "note": "Delete on a setting row at either scope; also how Delete global policy is sent (key \"policy\").",
+   "sdk": "yes",
+   "ui": "action",
+   "where": "frontend/src/pages/SettingsPage.tsx:174"
+  },
+  "openshell.v1.UpdateConfigRequest.expected_resource_version": {
+   "bff": "yes",
+   "note": "Sent only when a sandbox policy document is replaced; merges and setting writes send none (the merge body has no field for it).",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/PolicyRuleEditor/index.tsx:203"
+  },
+  "openshell.v1.UpdateConfigRequest.global": {
+   "bff": "yes",
+   "note": "Chosen by the page: Global policy and gateway Settings send true, the sandbox tabs false.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/policies_handler.go:302"
+  },
+  "openshell.v1.UpdateConfigRequest.merge_operations": {
+   "bff": "yes",
+   "note": "Five of the six operations are issued; removeBinary is not.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/PolicyRuleEditor/index.tsx:118"
+  },
+  "openshell.v1.UpdateConfigRequest.policy": {
+   "bff": "yes",
+   "note": "YAML or JSON document for a sandbox (Policy tab, Document) and for the global policy; no structured editor writes a whole policy.",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/components/PolicyRuleEditor/PolicyDocumentEditor.tsx:226"
+  },
+  "openshell.v1.UpdateConfigRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/policies_handler.go:124"
+  },
+  "openshell.v1.UpdateConfigRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route; empty for the global scope.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/policies_handler.go:125"
+  },
+  "openshell.v1.UpdateConfigRequest.setting_key": {
+   "bff": "yes",
+   "note": "Free text at gateway scope and at sandbox scope (SandboxSettingsTab.tsx:507); the gateway accepts its four registered keys.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/pages/SettingsPage.tsx:407"
+  },
+  "openshell.v1.UpdateConfigRequest.setting_value": {
+   "bff": "yes",
+   "note": "Typed string, boolean or integer; the create form also writes proposal_approval_mode this way.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/pages/SettingsPage.tsx:418"
+  },
+  "openshell.v1.UpdateConfigRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route; omitted for the global scope.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/policies_handler.go:124"
+  },
+  "openshell.v1.UpdateProviderProfilesRequest.expected_resource_version": {
+   "bff": "yes",
+   "note": "Taken from the file's resource_version, which the export writes.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/provider/ProfileFileModal.tsx:216"
+  },
+  "openshell.v1.UpdateProviderProfilesRequest.id": {
+   "bff": "yes",
+   "note": "The profile the file is chosen for.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/provider/ProfileFileModal.tsx:216"
+  },
+  "openshell.v1.UpdateProviderProfilesRequest.profile": {
+   "bff": "yes",
+   "note": "",
+   "sdk": "yes",
+   "ui": "document",
+   "where": "frontend/src/components/provider/ProfileFileModal.tsx:216"
+  },
+  "openshell.v1.UpdateProviderProfilesRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:91"
+  },
+  "openshell.v1.UpdateProviderProfilesRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "The workspace of the route, or none for a platform profile.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "backend/pkg/clients/rawprofile.go:43"
+  },
+  "openshell.v1.UpdateProviderRequest.clear_credential_expiration_keys": {
+   "bff": "no",
+   "note": "The SDK clears a key given a zero time, but the BFF refuses any expiry at or before 1970 and has no clear field, so an expiry once set cannot be removed (CLI: --credential-expires-at KEY=0).",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/providers_handler.go:222"
+  },
+  "openshell.v1.UpdateProviderRequest.credential_expiration_times": {
+   "bff": "yes",
+   "note": "Same input as Provider.credential_expiration_times: the SDK copies the map into both places.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:586"
+  },
+  "openshell.v1.UpdateProviderRequest.provider": {
+   "bff": "yes",
+   "note": "Carries the name and whichever of credentials, config and expiries the form changed; metadata.resource_version is not sent.",
+   "sdk": "yes",
+   "ui": "form",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:276"
+  },
+  "openshell.v1.UpdateProviderRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "no",
+   "ui": "plumbing",
+   "where": "backend/pkg/handlers/providers_handler.go:232"
+  },
+  "openshell.v1.UpdateProviderRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "Named workspace from the route's {workspace}.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/provider/ProviderFormModal.tsx:127"
+  },
+  "openshell.v1.UpdateSandboxRequest.annotations": {
+   "bff": "no",
+   "note": "No BFF route for UpdateSandbox and no SDK wrapper.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.UpdateSandboxRequest.command": {
+   "bff": "no",
+   "note": "No BFF route for UpdateSandbox and no SDK wrapper.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.UpdateSandboxRequest.environment": {
+   "bff": "no",
+   "note": "No BFF route for UpdateSandbox and no SDK wrapper.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.UpdateSandboxRequest.expected_resource_version": {
+   "bff": "no",
+   "note": "No BFF route for UpdateSandbox and no SDK wrapper.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.UpdateSandboxRequest.image": {
+   "bff": "no",
+   "note": "No BFF route for UpdateSandbox and no SDK wrapper.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.UpdateSandboxRequest.labels": {
+   "bff": "no",
+   "note": "No BFF route for UpdateSandbox and no SDK wrapper.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.UpdateSandboxRequest.name": {
+   "bff": "no",
+   "note": "No BFF route for UpdateSandbox and no SDK wrapper.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.UpdateSandboxRequest.request_id": {
+   "bff": "no",
+   "note": "Idempotency key. Never sent: no SDK wrapper sets it, so the gateway cannot recognise a retried request.",
+   "sdk": "n/a",
+   "ui": "plumbing",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.UpdateSandboxRequest.workspace_scope": {
+   "bff": "no",
+   "note": "No BFF route for UpdateSandbox and no SDK wrapper.",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:218"
+  },
+  "openshell.v1.WatchSandboxRequest.event_tail": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/services/sandbox.go:45"
+  },
+  "openshell.v1.WatchSandboxRequest.follow_events": {
+   "bff": "no",
+   "note": "Never set, and the SSE relay forwards only log and warning payloads, so platform events cannot be shown.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/services/sandbox.go:45"
+  },
+  "openshell.v1.WatchSandboxRequest.follow_logs": {
+   "bff": "fixed",
+   "note": "Always true.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/services/sandbox.go:53"
+  },
+  "openshell.v1.WatchSandboxRequest.follow_status": {
+   "bff": "fixed",
+   "note": "Always true, yet the relay discards every status snapshot it then receives (logs_handler.go:165).",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "backend/pkg/services/sandbox.go:52"
+  },
+  "openshell.v1.WatchSandboxRequest.log_min_level": {
+   "bff": "yes",
+   "note": "The route takes ?level= but the UI never sends it: the Minimum level select filters the retained lines in the browser, and hides every OCSF line the gateway's own filter would keep.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/logs_handler.go:91"
+  },
+  "openshell.v1.WatchSandboxRequest.log_sources": {
+   "bff": "yes",
+   "note": "The route takes ?source= but the UI never sends it: the Source select filters the retained lines in the browser.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/handlers/logs_handler.go:90"
+  },
+  "openshell.v1.WatchSandboxRequest.log_tail_lines": {
+   "bff": "yes",
+   "note": "The UI always sends lines=2000; the Line count select only trims what is shown.",
+   "sdk": "yes",
+   "ui": "fixed",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:178"
+  },
+  "openshell.v1.WatchSandboxRequest.resume_after_cursor": {
+   "bff": "no",
+   "note": "The relay drops each event's cursor, so a dropped stream cannot resume; the UI falls back to polling instead.",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/services/sandbox.go:45"
+  },
+  "openshell.v1.WatchSandboxRequest.sandbox": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:175"
+  },
+  "openshell.v1.WatchSandboxRequest.since_time": {
+   "bff": "no",
+   "note": "No SDK wrapper sets it; the Since input filters the retained lines in the browser.",
+   "sdk": "no",
+   "ui": "none",
+   "where": "backend/pkg/services/sandbox.go:45"
+  },
+  "openshell.v1.WatchSandboxRequest.stop_on_terminal": {
+   "bff": "no",
+   "note": "",
+   "sdk": "yes",
+   "ui": "none",
+   "where": "backend/pkg/services/sandbox.go:45"
+  },
+  "openshell.v1.WatchSandboxRequest.workspace_scope": {
+   "bff": "yes",
+   "note": "From the route.",
+   "sdk": "yes",
+   "ui": "plumbing",
+   "where": "frontend/src/components/sandbox/SandboxLogsTab.tsx:175"
+  },
+  "openshell.v1.WatchServiceRoutesRequest.workspace_scope": {
+   "bff": "no",
+   "note": "",
+   "sdk": "n/a",
+   "ui": "none",
+   "where": "backend/pkg/server/app.go:247"
+  }
+ }
+}

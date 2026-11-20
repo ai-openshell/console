@@ -138,6 +138,12 @@ class FakeUpstream(object):
             raise upstream.UpstreamError("ghcr.io/%s:%s: registry answered HTTP 503" % (repository, tag))
         return self.data["images"].get(key)
 
+    def proto_files(self, version):
+        """The protos of a release: a test's own, else none, as for a tag without a proto directory."""
+        if "protos" in self.data.get("outage", []):
+            raise upstream.UpstreamError("reading the protos of v%s failed: simulated" % version)
+        return self.data.get("protos", {}).get(version, {})
+
 
 def upstream_data(tags=None, images=None, outage=None, drop=(), sdk_missing=()):
     """The real upstream of 2026-10-09, with a test's additions on top.
@@ -409,3 +415,22 @@ class Repo(object):
             return self.git("rev-parse", "--verify", "-q", "refs/remotes/origin/%s" % name)
         except subprocess.CalledProcessError:
             return None
+
+
+def proto_repo(directory, releases):
+    """A clone of "upstream" in `directory`: one commit and one tag per release.
+
+    releases: [(version, {file name: text})], oldest first. Returns the path.
+    Made with nobody's git configuration, like Repo: a signing key or a hook
+    of the person running the tests has no say here.
+    """
+    git = lambda *args: Repo._git(None, directory, *args)  # noqa: E731
+    os.makedirs(os.path.join(directory, "proto"))
+    git("init", "-q")
+    for version, files in releases:
+        for name, text in files.items():
+            _write(os.path.join(directory, "proto", name), text)
+        git("add", "-A")
+        git("commit", "-q", "-m", "release %s" % version)
+        git("tag", "v%s" % version)
+    return directory

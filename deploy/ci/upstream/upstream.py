@@ -9,8 +9,11 @@ outage must stop the run, not be mistaken for "nothing newer was released".
 """
 
 import json
+import os
 import re
+import shutil
 import subprocess
+import tempfile
 
 UPSTREAM_REPO = "https://github.com/NVIDIA/OpenShell.git"
 UPSTREAM_URL = "https://github.com/NVIDIA/OpenShell"
@@ -102,3 +105,33 @@ class Upstream(object):
         except (subprocess.TimeoutExpired, OSError) as err:
             raise UpstreamError("%s: %s" % (reference, err))
         return read_inspect(reference, done.returncode, done.stdout, done.stderr)
+
+    def proto_files(self, version):
+        """The .proto files of upstream's release `version`: file name -> text.
+
+        A shallow, blob-less clone of the one tag, then the `proto` directory
+        alone: a few hundred kilobytes, whatever the size of the repository.
+        """
+        tag = "v%s" % version
+        scratch = tempfile.mkdtemp(prefix="openshell-proto-")
+        try:
+            for command in (
+                ["git", "clone", "--quiet", "--depth", "1", "--filter=blob:none", "--no-checkout", "--branch", tag, UPSTREAM_REPO, scratch],
+                ["git", "-C", scratch, "checkout", "--quiet", tag, "--", "proto"],
+            ):
+                subprocess.run(
+                    command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=self.timeout
+                )
+            files = {}
+            directory = os.path.join(scratch, "proto")
+            for name in sorted(os.listdir(directory)):
+                if name.endswith(".proto"):
+                    with open(os.path.join(directory, name), encoding="utf-8") as fh:
+                        files[name] = fh.read()
+            return files
+        except subprocess.CalledProcessError as err:
+            raise UpstreamError("reading the protos of %s failed: %s" % (tag, (err.stderr or "").strip() or err))
+        except (subprocess.TimeoutExpired, OSError) as err:
+            raise UpstreamError("reading the protos of %s failed: %s" % (tag, err))
+        finally:
+            shutil.rmtree(scratch, ignore_errors=True)
