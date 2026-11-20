@@ -24,7 +24,7 @@ import { useImportProviderProfiles } from '../api/providers';
 import type {
   ImportProfileRequest,
   ProfileCredentialInput,
-  ProfileEndpoint,
+  ProfileNetworkEndpoint,
   ProviderProfileCategory,
 } from '../types';
 
@@ -64,6 +64,71 @@ const credentialOf = (row: CredentialRow): ProfileCredentialInput => {
   };
 };
 
+// An endpoint as the form holds it. A profile endpoint is the sandbox policy's
+// NetworkEndpoint, and the gateway refuses one that carries credentials over
+// L4 only unless it says allow_uninspected_credentials, so the form offers the
+// protocols it inspects and that opt-out. An inspected protocol needs an
+// access preset (or rules, which only a profile file can write).
+type EndpointRow = {
+  host: string;
+  port: string;
+  protocol: EndpointProtocol;
+  access: string;
+  allowUninspectedCredentials: boolean;
+};
+
+type EndpointProtocol = 'rest' | 'websocket' | '';
+
+const ENDPOINT_PROTOCOLS: { value: EndpointProtocol; label: string }[] = [
+  { value: 'rest', label: 'REST' },
+  { value: 'websocket', label: 'WebSocket' },
+  { value: '', label: 'Not inspected (L4)' },
+];
+
+const ACCESS_PRESETS = [
+  { value: 'NETWORK_ACCESS_PRESET_READ_ONLY', label: 'Read-only' },
+  { value: 'NETWORK_ACCESS_PRESET_READ_WRITE', label: 'Read-write' },
+  { value: 'NETWORK_ACCESS_PRESET_FULL', label: 'Full' },
+];
+
+const newEndpointRow = (): EndpointRow => ({
+  host: '',
+  port: '443',
+  protocol: 'rest',
+  access: 'NETWORK_ACCESS_PRESET_READ_WRITE',
+  allowUninspectedCredentials: false,
+});
+
+// What is wrong with a host as typed, if anything. The gateway stores a host
+// with a scheme or a path as it is (lint passes `api.example.com/`), and such
+// a host never matches a request, so the form says so before it is sent.
+const endpointHostProblem = (host: string): string | undefined => {
+  const value = host.trim();
+  if (!value) return undefined;
+  if (value.includes('://')) {
+    return 'Enter the host name only, without a scheme like https://';
+  }
+  if (/[/\s?#]/.test(value)) {
+    return 'A host has no path, spaces, query or trailing slash';
+  }
+  return undefined;
+};
+
+// The endpoint a row describes, in the gateway's own spelling. A field the
+// chosen protocol does not take is left out rather than sent to be refused.
+const endpointOf = (row: EndpointRow): ProfileNetworkEndpoint => {
+  const endpoint: ProfileNetworkEndpoint = { host: row.host.trim() };
+  const port = Number(row.port);
+  if (row.port.trim() && Number.isInteger(port)) endpoint.port = port;
+  if (row.protocol) {
+    endpoint.protocol = row.protocol;
+    endpoint.access = row.access;
+  } else if (row.allowUninspectedCredentials) {
+    endpoint.allowUninspectedCredentials = true;
+  }
+  return endpoint;
+};
+
 const CATEGORIES: { value: ProviderProfileCategory; label: string }[] = [
   { value: 'INFERENCE', label: 'Inference' },
   { value: 'AGENT', label: 'Agent' },
@@ -86,7 +151,7 @@ const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
   const [category, setCategory] = useState<ProviderProfileCategory>('OTHER');
   const [inferenceCapable, setInferenceCapable] = useState(false);
   const [credentials, setCredentials] = useState<CredentialRow[]>([]);
-  const [endpoints, setEndpoints] = useState<ProfileEndpoint[]>([]);
+  const [endpoints, setEndpoints] = useState<EndpointRow[]>([]);
   const importProfiles = useImportProviderProfiles(workspace);
 
   const close = () => {
@@ -110,7 +175,8 @@ const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
       inferenceCapable,
       credentials:
         credentials.length > 0 ? credentials.map(credentialOf) : undefined,
-      endpoints: endpoints.length > 0 ? endpoints : undefined,
+      networkEndpoints:
+        endpoints.length > 0 ? endpoints.map(endpointOf) : undefined,
     };
     importProfiles.mutate([profile], {
       onSuccess: (resp) => {
@@ -123,6 +189,12 @@ const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
   };
 
   const diagnostics = importProfiles.data?.diagnostics ?? [];
+  const hasCredentials = credentials.length > 0;
+  const hasHostProblem = endpoints.some((ep) => endpointHostProblem(ep.host));
+  const updateEndpoint = (index: number, change: Partial<EndpointRow>) =>
+    setEndpoints((rows) =>
+      rows.map((r, i) => (i === index ? { ...r, ...change } : r)),
+    );
 
   return (
     <Modal
@@ -301,60 +373,143 @@ const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
             fieldId="profile-endpoints"
             role="group"
           >
-            {endpoints.map((ep, index) => (
-              <Grid hasGutter key={index} className="pf-v6-u-mb-sm">
-                <GridItem span={6}>
-                  <TextInput
-                    id={`endpoint-host-${index}`}
-                    data-testid={`endpoint-host-${index}`}
-                    value={ep.host}
-                    onChange={(_event, value) =>
-                      setEndpoints((rows) =>
-                        rows.map((r, i) =>
-                          i === index ? { ...r, host: value } : r,
-                        ),
-                      )
-                    }
-                    placeholder="Host (e.g. api.example.com)"
-                    aria-label="Endpoint host"
-                  />
-                </GridItem>
-                <GridItem span={3}>
-                  <TextInput
-                    id={`endpoint-port-${index}`}
-                    data-testid={`endpoint-port-${index}`}
-                    type="number"
-                    value={ep.port ?? ''}
-                    onChange={(_event, value) =>
-                      setEndpoints((rows) =>
-                        rows.map((r, i) =>
-                          i === index
-                            ? { ...r, port: value ? Number(value) : undefined }
-                            : r,
-                        ),
-                      )
-                    }
-                    placeholder="Port"
-                    aria-label="Endpoint port"
-                  />
-                </GridItem>
-                <GridItem span={3}>
-                  <Button
-                    variant="link"
-                    onClick={() =>
-                      setEndpoints((rows) => rows.filter((_, i) => i !== index))
-                    }
-                    data-testid={`endpoint-remove-${index}`}
-                  >
-                    Remove
-                  </Button>
-                </GridItem>
-              </Grid>
-            ))}
+            {endpoints.map((ep, index) => {
+              const hostProblem = endpointHostProblem(ep.host);
+              const uninspected =
+                hasCredentials &&
+                !ep.protocol &&
+                !ep.allowUninspectedCredentials;
+              return (
+                <Grid hasGutter key={index} className="pf-v6-u-mb-md">
+                  <GridItem span={5}>
+                    <TextInput
+                      id={`endpoint-host-${index}`}
+                      data-testid={`endpoint-host-${index}`}
+                      value={ep.host}
+                      validated={hostProblem ? 'error' : 'default'}
+                      onChange={(_event, value) =>
+                        updateEndpoint(index, { host: value })
+                      }
+                      placeholder="Host (e.g. api.example.com)"
+                      aria-label="Endpoint host"
+                    />
+                  </GridItem>
+                  <GridItem span={2}>
+                    <TextInput
+                      id={`endpoint-port-${index}`}
+                      data-testid={`endpoint-port-${index}`}
+                      type="number"
+                      value={ep.port}
+                      onChange={(_event, value) =>
+                        updateEndpoint(index, { port: value })
+                      }
+                      placeholder="Port"
+                      aria-label="Endpoint port"
+                    />
+                  </GridItem>
+                  <GridItem span={3}>
+                    <FormSelect
+                      id={`endpoint-protocol-${index}`}
+                      data-testid={`endpoint-protocol-${index}`}
+                      value={ep.protocol}
+                      onChange={(_event, value) =>
+                        updateEndpoint(index, {
+                          protocol: value as EndpointProtocol,
+                        })
+                      }
+                      aria-label="Endpoint protocol"
+                    >
+                      {ENDPOINT_PROTOCOLS.map((option) => (
+                        <FormSelectOption
+                          key={option.value}
+                          value={option.value}
+                          label={option.label}
+                        />
+                      ))}
+                    </FormSelect>
+                  </GridItem>
+                  <GridItem span={2}>
+                    <Button
+                      variant="link"
+                      onClick={() =>
+                        setEndpoints((rows) =>
+                          rows.filter((_, i) => i !== index),
+                        )
+                      }
+                      data-testid={`endpoint-remove-${index}`}
+                    >
+                      Remove
+                    </Button>
+                  </GridItem>
+                  {hostProblem && (
+                    <GridItem span={12}>
+                      <HelperText>
+                        <HelperTextItem
+                          variant="error"
+                          data-testid={`endpoint-host-error-${index}`}
+                        >
+                          {hostProblem}
+                        </HelperTextItem>
+                      </HelperText>
+                    </GridItem>
+                  )}
+                  <GridItem span={ep.protocol ? 5 : 12}>
+                    {ep.protocol ? (
+                      <FormSelect
+                        id={`endpoint-access-${index}`}
+                        data-testid={`endpoint-access-${index}`}
+                        value={ep.access}
+                        onChange={(_event, value) =>
+                          updateEndpoint(index, { access: value })
+                        }
+                        aria-label="Endpoint access"
+                      >
+                        {ACCESS_PRESETS.map((option) => (
+                          <FormSelectOption
+                            key={option.value}
+                            value={option.value}
+                            label={`Access: ${option.label}`}
+                          />
+                        ))}
+                      </FormSelect>
+                    ) : (
+                      <Checkbox
+                        id={`endpoint-uninspected-${index}`}
+                        data-testid={`endpoint-uninspected-${index}`}
+                        label="Allow credentials on traffic OpenShell cannot inspect"
+                        description="A security-sensitive escape hatch: credential-bearing requests go out without inspection or rewriting."
+                        isChecked={ep.allowUninspectedCredentials}
+                        onChange={(_event, checked) =>
+                          updateEndpoint(index, {
+                            allowUninspectedCredentials: checked,
+                          })
+                        }
+                      />
+                    )}
+                  </GridItem>
+                  {uninspected && (
+                    <GridItem span={12}>
+                      <HelperText>
+                        <HelperTextItem
+                          variant="warning"
+                          data-testid={`endpoint-uninspected-warning-${index}`}
+                        >
+                          The gateway refuses credentials on an endpoint it
+                          cannot inspect. Choose REST or WebSocket, or allow
+                          uninspected credentials.
+                        </HelperTextItem>
+                      </HelperText>
+                    </GridItem>
+                  )}
+                </Grid>
+              );
+            })}
             <Button
               variant="link"
               isInline
-              onClick={() => setEndpoints((rows) => [...rows, { host: '' }])}
+              onClick={() =>
+                setEndpoints((rows) => [...rows, newEndpointRow()])
+              }
               data-testid="endpoint-add"
             >
               Add endpoint
@@ -390,7 +545,9 @@ const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
         <Button
           variant="primary"
           onClick={submit}
-          isDisabled={!id || !displayName || importProfiles.isPending}
+          isDisabled={
+            !id || !displayName || hasHostProblem || importProfiles.isPending
+          }
           isLoading={importProfiles.isPending}
           data-testid="create-profile-submit"
         >

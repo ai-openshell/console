@@ -142,3 +142,100 @@ describe('CreateProfileModal environment variables', () => {
     });
   });
 });
+
+// A profile endpoint is a policy NetworkEndpoint, and the gateway refuses a
+// credentialed one that is L4 only unless it allows uninspected credentials.
+describe('CreateProfileModal network endpoints', () => {
+  const addCredentialedEndpoint = () => {
+    renderModal();
+    fillRequired();
+    fireEvent.click(screen.getByTestId('cred-add'));
+    type('cred-name-0', 'api_key');
+    type('cred-env-0', 'CUSTOMER_API_KEY');
+    fireEvent.click(screen.getByTestId('endpoint-add'));
+    type('endpoint-host-0', 'api.example.com');
+  };
+
+  it('sends an inspected REST endpoint with an access preset by default', () => {
+    addCredentialedEndpoint();
+    fireEvent.click(screen.getByTestId('create-profile-submit'));
+
+    expect(submitted().endpoints).toBeUndefined();
+    expect(submitted().networkEndpoints).toEqual([
+      {
+        host: 'api.example.com',
+        port: 443,
+        protocol: 'rest',
+        access: 'NETWORK_ACCESS_PRESET_READ_WRITE',
+      },
+    ]);
+  });
+
+  it('sends the access preset that was chosen', () => {
+    addCredentialedEndpoint();
+    fireEvent.change(screen.getByTestId('endpoint-protocol-0'), {
+      target: { value: 'websocket' },
+    });
+    fireEvent.change(screen.getByTestId('endpoint-access-0'), {
+      target: { value: 'NETWORK_ACCESS_PRESET_FULL' },
+    });
+    fireEvent.click(screen.getByTestId('create-profile-submit'));
+
+    expect(submitted().networkEndpoints).toEqual([
+      {
+        host: 'api.example.com',
+        port: 443,
+        protocol: 'websocket',
+        access: 'NETWORK_ACCESS_PRESET_FULL',
+      },
+    ]);
+  });
+
+  it('warns about a credentialed L4 endpoint until uninspected credentials are allowed', () => {
+    addCredentialedEndpoint();
+    fireEvent.change(screen.getByTestId('endpoint-protocol-0'), {
+      target: { value: '' },
+    });
+    expect(
+      screen.getByTestId('endpoint-uninspected-warning-0'),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('endpoint-access-0')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('endpoint-uninspected-0'));
+    expect(
+      screen.queryByTestId('endpoint-uninspected-warning-0'),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('create-profile-submit'));
+    expect(submitted().networkEndpoints).toEqual([
+      { host: 'api.example.com', port: 443, allowUninspectedCredentials: true },
+    ]);
+  });
+
+  it('does not warn about an L4 endpoint of a profile without credentials', () => {
+    renderModal();
+    fireEvent.click(screen.getByTestId('endpoint-add'));
+    fireEvent.change(screen.getByTestId('endpoint-protocol-0'), {
+      target: { value: '' },
+    });
+    expect(
+      screen.queryByTestId('endpoint-uninspected-warning-0'),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    'api.example.com/',
+    'https://api.example.com',
+    'api.example.com/v1',
+  ])('refuses the host %s before it is sent', (host) => {
+    renderModal();
+    fillRequired();
+    fireEvent.click(screen.getByTestId('endpoint-add'));
+    fireEvent.change(screen.getByTestId('endpoint-host-0'), {
+      target: { value: host },
+    });
+
+    expect(screen.getByTestId('endpoint-host-error-0')).toBeInTheDocument();
+    expect(screen.getByTestId('create-profile-submit')).toBeDisabled();
+  });
+});
